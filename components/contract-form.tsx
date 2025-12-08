@@ -1,0 +1,333 @@
+"use client"
+
+import type React from "react"
+
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
+import { ChevronLeft, ChevronRight, Send, Loader2, MessageSquare, FileText } from "lucide-react"
+import type { ContractTemplate, ContractField } from "@/lib/contracts"
+
+interface ContractFormProps {
+  contract: ContractTemplate
+  onSubmit: (data: Record<string, string>) => Promise<void>
+  isSubmitting: boolean
+}
+
+export function ContractForm({ contract, onSubmit, isSubmitting }: ContractFormProps) {
+  const [formData, setFormData] = useState<Record<string, string>>({})
+  const [currentStep, setCurrentStep] = useState(0)
+  const [mode, setMode] = useState<"form" | "chat">("form")
+  const [chatMessages, setChatMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([
+    {
+      role: "assistant",
+      content: `Hi! I'm here to help you fill out the ${contract.name}. Let's start with the first question: What is the ${contract.fields[0].label.toLowerCase()}? (You can skip any field by typing "skip")`,
+    },
+  ])
+  const [chatInput, setChatInput] = useState("")
+  const [currentChatField, setCurrentChatField] = useState(0)
+
+  const fieldsPerStep = 4
+  const totalSteps = Math.ceil(contract.fields.length / fieldsPerStep)
+  const currentFields = contract.fields.slice(currentStep * fieldsPerStep, (currentStep + 1) * fieldsPerStep)
+
+  const progress = ((currentStep + 1) / totalSteps) * 100
+
+  const handleInputChange = (fieldId: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [fieldId]: value }))
+  }
+
+  const handleNext = () => {
+    if (currentStep < totalSteps - 1) {
+      setCurrentStep((prev) => prev + 1)
+    }
+  }
+
+  const handlePrevious = () => {
+    if (currentStep > 0) {
+      setCurrentStep((prev) => prev - 1)
+    }
+  }
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await onSubmit(formData)
+  }
+
+  const handleChatSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!chatInput.trim()) return
+
+    const userMessage = chatInput
+    setChatInput("")
+    setChatMessages((prev) => [...prev, { role: "user", content: userMessage }])
+
+    const currentField = contract.fields[currentChatField]
+    if (userMessage.toLowerCase() !== "skip") {
+      setFormData((prev) => ({ ...prev, [currentField.id]: userMessage }))
+    }
+
+    // Move to next field or complete
+    if (currentChatField < contract.fields.length - 1) {
+      const nextField = contract.fields[currentChatField + 1]
+      setTimeout(() => {
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: `Got it! Now, what is the ${nextField.label.toLowerCase()}?${nextField.description ? ` (${nextField.description})` : ""} (Type "skip" to leave blank)`,
+          },
+        ])
+        setCurrentChatField((prev) => prev + 1)
+      }, 500)
+    } else {
+      setTimeout(() => {
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content:
+              "Perfect! I have all the information needed. Click the 'Generate Contract' button below to create your personalized contract.",
+          },
+        ])
+      }, 500)
+    }
+  }
+
+  const renderField = (field: ContractField) => {
+    const value = formData[field.id] || ""
+
+    return (
+      <div key={field.id} className="space-y-2">
+        <Label htmlFor={field.id} className="text-foreground flex items-center gap-2">
+          {field.label}
+          <span className="text-muted-foreground text-xs">Optional</span>
+        </Label>
+        {field.description && <p className="text-xs text-muted-foreground">{field.description}</p>}
+        {field.type === "textarea" ? (
+          <Textarea
+            id={field.id}
+            value={value}
+            onChange={(e) => handleInputChange(field.id, e.target.value)}
+            placeholder={field.placeholder}
+            className="bg-input border-border text-foreground placeholder:text-muted-foreground"
+          />
+        ) : field.type === "date" ? (
+          <Input
+            id={field.id}
+            type="date"
+            value={value}
+            onChange={(e) => handleInputChange(field.id, e.target.value)}
+            className="bg-input border-border text-foreground"
+          />
+        ) : field.type === "number" ? (
+          <Input
+            id={field.id}
+            type="number"
+            value={value}
+            onChange={(e) => handleInputChange(field.id, e.target.value)}
+            placeholder={field.placeholder}
+            className="bg-input border-border text-foreground placeholder:text-muted-foreground"
+          />
+        ) : field.type === "currency" ? (
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+            <Input
+              id={field.id}
+              type="number"
+              value={value}
+              onChange={(e) => handleInputChange(field.id, e.target.value)}
+              placeholder={field.placeholder || "0.00"}
+              className="bg-input border-border text-foreground placeholder:text-muted-foreground pl-7"
+            />
+          </div>
+        ) : field.type === "percentage" ? (
+          <div className="relative">
+            <Input
+              id={field.id}
+              type="number"
+              value={value}
+              onChange={(e) => handleInputChange(field.id, e.target.value)}
+              placeholder={field.placeholder || "0"}
+              className="bg-input border-border text-foreground placeholder:text-muted-foreground pr-7"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
+          </div>
+        ) : (
+          <Input
+            id={field.id}
+            type={field.type}
+            value={value}
+            onChange={(e) => handleInputChange(field.id, e.target.value)}
+            placeholder={field.placeholder}
+            className="bg-input border-border text-foreground placeholder:text-muted-foreground"
+          />
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex gap-2 mb-6">
+        <Button
+          variant={mode === "form" ? "default" : "outline"}
+          onClick={() => setMode("form")}
+          className={mode === "form" ? "bg-primary text-primary-foreground" : "border-border"}
+        >
+          <FileText className="w-4 h-4 mr-2" />
+          Form Mode
+        </Button>
+        <Button
+          variant={mode === "chat" ? "default" : "outline"}
+          onClick={() => setMode("chat")}
+          className={mode === "chat" ? "bg-primary text-primary-foreground" : "border-border"}
+        >
+          <MessageSquare className="w-4 h-4 mr-2" />
+          Chat Mode
+        </Button>
+      </div>
+
+      {mode === "form" ? (
+        <form onSubmit={handleFormSubmit}>
+          <Card className="bg-card border-border">
+            <CardHeader>
+              <div className="flex items-center justify-between mb-4">
+                <CardTitle className="text-foreground">
+                  Step {currentStep + 1} of {totalSteps}
+                </CardTitle>
+                <span className="text-sm text-muted-foreground">{Math.round(progress)}% complete</span>
+              </div>
+              <Progress value={progress} className="h-2 bg-secondary" />
+              <CardDescription className="text-muted-foreground mt-4">
+                Fill in the information for your contract. All fields are optional.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {currentFields.map(renderField)}
+
+              <div className="flex justify-between pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handlePrevious}
+                  disabled={currentStep === 0}
+                  className="border-border hover:bg-secondary bg-transparent"
+                >
+                  <ChevronLeft className="w-4 h-4 mr-2" />
+                  Previous
+                </Button>
+
+                {currentStep === totalSteps - 1 ? (
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4 mr-2" />
+                        Generate Contract
+                      </>
+                    )}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    onClick={handleNext}
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    Next
+                    <ChevronRight className="w-4 h-4 ml-2" />
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </form>
+      ) : (
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="text-foreground flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-primary" />
+              Conversational Form
+            </CardTitle>
+            <CardDescription className="text-muted-foreground">
+              Answer questions one at a time to fill out your contract. Type "skip" to leave any field blank.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[400px] overflow-y-auto mb-4 space-y-4 p-4 bg-secondary/30 rounded-lg">
+              {chatMessages.map((message, index) => (
+                <div key={index} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div
+                    className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                      message.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-card border border-border text-foreground"
+                    }`}
+                  >
+                    {message.content}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <form onSubmit={handleChatSubmit} className="flex gap-2">
+              <Input
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Type your answer or 'skip' to leave blank..."
+                className="bg-input border-border text-foreground placeholder:text-muted-foreground"
+                disabled={currentChatField >= contract.fields.length}
+              />
+              <Button
+                type="submit"
+                disabled={currentChatField >= contract.fields.length || !chatInput.trim()}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                <Send className="w-4 h-4" />
+              </Button>
+            </form>
+
+            {currentChatField >= contract.fields.length && (
+              <Button
+                onClick={() => onSubmit(formData)}
+                disabled={isSubmitting}
+                className="w-full mt-4 bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4 mr-2" />
+                    Generate Contract
+                  </>
+                )}
+              </Button>
+            )}
+
+            <div className="mt-4 text-center">
+              <Progress value={(currentChatField / contract.fields.length) * 100} className="h-2 bg-secondary" />
+              <p className="text-xs text-muted-foreground mt-2">
+                {currentChatField} of {contract.fields.length} fields completed
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
