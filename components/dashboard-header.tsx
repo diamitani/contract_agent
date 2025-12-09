@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { Sparkles, LayoutDashboard, Home, LogOut, User } from "lucide-react"
+import { Sparkles, LayoutDashboard, LogOut, User, BarChart3, FileText } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -57,12 +57,12 @@ export function DashboardHeader() {
         </Link>
         <nav className="flex items-center gap-6">
           <Link
-            href="/"
+            href="/templates"
             className={`text-sm flex items-center gap-2 transition-colors ${
-              pathname === "/" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+              pathname === "/templates" ? "text-primary" : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <Home className="w-4 h-4" />
+            <FileText className="w-4 h-4" />
             Templates
           </Link>
           <Link
@@ -73,6 +73,15 @@ export function DashboardHeader() {
           >
             <LayoutDashboard className="w-4 h-4" />
             Dashboard
+          </Link>
+          <Link
+            href="/dashboard/insights"
+            className={`text-sm flex items-center gap-2 transition-colors ${
+              pathname === "/dashboard/insights" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            Insights
           </Link>
           <div className="flex items-center gap-2 text-accent">
             <Sparkles className="w-4 h-4" />
@@ -105,6 +114,12 @@ export function DashboardHeader() {
                   <Link href="/dashboard" className="cursor-pointer">
                     <LayoutDashboard className="mr-2 h-4 w-4" />
                     Dashboard
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard/insights" className="cursor-pointer">
+                    <BarChart3 className="mr-2 h-4 w-4" />
+                    Insights
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>

@@ -1,8 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-
-const OPENAI_API_KEY =
-  "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"
+import { generateWithFallback } from "@/lib/ai"
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,35 +32,20 @@ export async function POST(request: NextRequest) {
       if (contentType.includes("text") || storagePath.endsWith(".txt")) {
         extractedText = await response.text()
       } else {
-        // For PDFs and other formats, we'll use a simple extraction
-        // In production, you'd want to use a proper PDF parsing library
         const buffer = await response.arrayBuffer()
         const text = new TextDecoder("utf-8", { fatal: false }).decode(buffer)
-        // Extract readable text portions
         extractedText = text
           .replace(/[^\x20-\x7E\n\r\t]/g, " ")
           .replace(/\s+/g, " ")
           .trim()
-          .slice(0, 15000) // Limit for API
+          .slice(0, 15000)
       }
     } catch (fetchError) {
       console.error("Error fetching file:", fetchError)
       extractedText = "Unable to extract text from file."
     }
 
-    // Analyze with OpenAI
-    const analysisResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `You are a contract analysis expert. Analyze the following contract and provide:
+    const systemPrompt = `You are a contract analysis expert. Analyze the following contract and provide:
 1. A brief summary (2-3 sentences)
 2. Key terms and definitions found
 3. Potential risks or concerns
@@ -76,19 +59,17 @@ Respond in JSON format:
   "risks": ["risk1", "risk2"],
   "obligations": ["obligation1", "obligation2"],
   "dates": ["date1", "date2"]
-}`,
-          },
-          {
-            role: "user",
-            content: `Analyze this contract:\n\n${extractedText.slice(0, 12000)}`,
-          },
-        ],
-        temperature: 0.3,
-        max_tokens: 2000,
-      }),
+}`
+
+    const { text: analysisText, model } = await generateWithFallback({
+      systemPrompt,
+      userPrompt: `Analyze this contract:\n\n${extractedText.slice(0, 12000)}`,
+      maxOutputTokens: 2000,
+      temperature: 0.3,
     })
 
-    const analysisData = await analysisResponse.json()
+    console.log(`[AI] Analysis completed using ${model}`)
+
     let analysis = {
       summary: "Analysis could not be completed.",
       key_terms: [],
@@ -98,8 +79,7 @@ Respond in JSON format:
     }
 
     try {
-      const content = analysisData.choices?.[0]?.message?.content || ""
-      const jsonMatch = content.match(/\{[\s\S]*\}/)
+      const jsonMatch = analysisText.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
         analysis = JSON.parse(jsonMatch[0])
       }
@@ -118,7 +98,7 @@ Respond in JSON format:
       .eq("id", fileId)
       .eq("user_id", user.id)
 
-    return NextResponse.json({ analysis, extractedText: extractedText.slice(0, 5000) })
+    return NextResponse.json({ analysis, extractedText: extractedText.slice(0, 5000), model })
   } catch (error) {
     console.error("Analysis error:", error)
     return NextResponse.json({ error: "Analysis failed" }, { status: 500 })
