@@ -11,6 +11,7 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { FileText, Shield, Zap, PenTool, CheckCircle2 } from "lucide-react"
+import { APP_ID } from "@/lib/constants"
 
 const features = [
   {
@@ -58,6 +59,7 @@ export default function SignUpPage() {
             process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/auth/callback`,
           data: {
             full_name: fullName,
+            app_id: APP_ID,
           },
         },
       })

@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import type Stripe from "stripe"
+import { APP_ID } from "@/lib/constants"
 
 // Use service role for webhook handler
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
@@ -26,6 +27,7 @@ export async function POST(request: NextRequest) {
         const session = event.data.object as Stripe.Checkout.Session
         const userId = session.metadata?.user_id
         const productType = session.metadata?.product_type
+        const appId = session.metadata?.app_id || APP_ID
 
         if (!userId) break
 
@@ -35,6 +37,7 @@ export async function POST(request: NextRequest) {
           .update({
             status: "completed",
             stripe_payment_id: session.payment_intent as string,
+            app_id: appId, // Track which app processed the payment
           })
           .eq("stripe_session_id", session.id)
 

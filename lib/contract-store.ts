@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client"
+import { APP_ID } from "@/lib/constants"
 
 export interface SavedContract {
   id: string
@@ -10,6 +11,7 @@ export interface SavedContract {
   status: "draft" | "completed" | "pending"
   created_at: string
   updated_at: string
+  app_id: string // Added app_id field
 }
 
 export interface UploadedFile {
@@ -31,6 +33,7 @@ export interface UploadedFile {
   }
   extracted_text?: string
   created_at: string
+  app_id: string // Added app_id field
 }
 
 export interface Folder {
@@ -83,6 +86,7 @@ export async function saveContract(
       contract_type: contract.contract_type,
       content: contract.content,
       form_data: contract.form_data,
+      app_id: APP_ID, // Added app_id to track which platform created the contract
     })
     .select()
     .single()
@@ -177,6 +181,7 @@ export async function saveUploadedFile(
     .insert({
       user_id: user.id,
       ...file,
+      app_id: APP_ID, // Added app_id to track which platform uploaded the file
     })
     .select()
     .single()
@@ -365,6 +370,7 @@ export async function trackEvent(eventType: string, eventData: Record<string, un
       user_id: user.id,
       event_type: eventType,
       event_data: eventData,
+      app_id: APP_ID, // Added app_id to track which platform generated the event
     })
   } catch (err) {
     console.warn("Analytics table not available:", err)

@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { stripe, PRODUCTS, type ProductType, type Stripe } from "@/lib/stripe"
 import { createClient } from "@/lib/supabase/server"
+import { APP_ID } from "@/lib/constants"
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,16 +39,19 @@ export async function POST(request: NextRequest) {
         email: user.email,
         metadata: {
           user_id: user.id,
+          app_id: APP_ID, // Track which app created the customer
         },
       })
       customerId = customer.id
 
-      // Update profile with Stripe customer ID
-      await supabase.from("user_profiles").upsert({
-        user_id: user.id,
-        email: user.email,
-        stripe_customer_id: customerId,
-      })
+      await supabase.from("user_profiles").upsert(
+        {
+          user_id: user.id,
+          email: user.email,
+          stripe_customer_id: customerId,
+        },
+        { onConflict: "user_id" },
+      )
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.headers.get("origin") || "http://localhost:3000"
@@ -63,6 +67,7 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         product_type: productType,
         contract_slug: contractSlug || "",
+        app_id: APP_ID, // Track which app initiated the checkout
       },
       line_items: [
         {
@@ -83,13 +88,14 @@ export async function POST(request: NextRequest) {
 
     const session = await stripe.checkout.sessions.create(sessionConfig)
 
-    // Record pending payment
+    // Record pending payment with app_id
     await supabase.from("payments").insert({
       user_id: user.id,
       stripe_session_id: session.id,
       amount: product.price,
       product_type: productType,
       status: "pending",
+      app_id: APP_ID, // Track which app processed the payment
     })
 
     return NextResponse.json({ url: session.url })
