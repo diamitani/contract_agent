@@ -5,17 +5,17 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ""
 
 function getOpenAIClient() {
   const key = process.env.OPENAI_API_KEY || OPENAI_API_KEY
-  
+
   if (!key) {
     throw new Error("OPENAI_API_KEY environment variable is required")
   }
-  
+
   if (key.startsWith("AIzaSy")) {
     throw new Error(
       "OPENAI_API_KEY appears to be a Google/Gemini API key. Please set a valid OpenAI API key (starts with 'sk-').",
     )
   }
-  
+
   return createOpenAI({ apiKey: key })
 }
 
@@ -74,7 +74,6 @@ export async function generateChat(options: {
   const openai = getOpenAIClient()
 
   try {
-    // Build conversation prompt for single-turn call
     const conversationPrompt = messages
       .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
       .join("\n\n")
