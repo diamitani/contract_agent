@@ -11,7 +11,7 @@ import { saveContract } from "@/lib/contract-store"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, FileText, Eye, Info, Lock, Zap, Crown, Loader2 } from "lucide-react"
+import { ArrowLeft, FileText, Eye, Info, Lock, Zap, Crown, Loader2, Gift } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { createBrowserClient } from "@supabase/ssr"
@@ -34,6 +34,7 @@ export default function GenerateContractPage() {
   const [canGenerate, setCanGenerate] = useState(false)
   const [subscriptionStatus, setSubscriptionStatus] = useState<string>("free")
   const [contractsRemaining, setContractsRemaining] = useState(0)
+  const [freeContractAvailable, setFreeContractAvailable] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [purchaseLoadingType, setPurchaseLoadingType] = useState<"per_contract" | "unlimited" | null>(null)
 
@@ -60,6 +61,7 @@ export default function GenerateContractPage() {
         setCanGenerate(data.canGenerate)
         setSubscriptionStatus(data.status)
         setContractsRemaining(data.contractsRemaining || 0)
+        setFreeContractAvailable(data.freeContractAvailable || false)
       } catch (error) {
         console.error("Failed to check subscription:", error)
       }
@@ -132,7 +134,15 @@ export default function GenerateContractPage() {
 
     try {
       // Use a contract credit first
-      await fetch("/api/use-contract-credit", { method: "POST" })
+      const creditRes = await fetch("/api/use-contract-credit", { method: "POST" })
+      const creditData = await creditRes.json()
+
+      if (creditData.usedFreeContract) {
+        toast({
+          title: "Free Contract Used",
+          description: "You've used your free monthly contract. It will reset next month!",
+        })
+      }
 
       const response = await fetch("/api/generate-contract", {
         method: "POST",
@@ -211,10 +221,14 @@ export default function GenerateContractPage() {
           })
         }
 
-        // Update remaining credits display
-        if (subscriptionStatus === "per_contract") {
+        if (creditData.usedFreeContract) {
+          setFreeContractAvailable(false)
+          if (subscriptionStatus === "free" && contractsRemaining === 0) {
+            setCanGenerate(false)
+          }
+        } else if (subscriptionStatus === "per_contract") {
           setContractsRemaining((prev) => Math.max(0, prev - 1))
-          if (contractsRemaining <= 1) {
+          if (contractsRemaining <= 1 && !freeContractAvailable) {
             setCanGenerate(false)
           }
         }
@@ -243,6 +257,45 @@ export default function GenerateContractPage() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const getStatusDisplay = () => {
+    if (subscriptionStatus === "unlimited") {
+      return (
+        <div className="flex items-center gap-2 text-amber-500">
+          <Crown className="w-4 h-4" />
+          <span className="text-sm font-medium">Unlimited Plan Active</span>
+        </div>
+      )
+    }
+
+    if (subscriptionStatus === "per_contract" && contractsRemaining > 0) {
+      return (
+        <div className="flex items-center gap-2 text-primary">
+          <Zap className="w-4 h-4" />
+          <span className="text-sm font-medium">
+            {contractsRemaining} credit{contractsRemaining !== 1 ? "s" : ""} remaining
+            {freeContractAvailable && " + 1 free"}
+          </span>
+        </div>
+      )
+    }
+
+    if (freeContractAvailable) {
+      return (
+        <div className="flex items-center gap-2 text-green-500">
+          <Gift className="w-4 h-4" />
+          <span className="text-sm font-medium">1 free contract available this month</span>
+        </div>
+      )
+    }
+
+    return (
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Lock className="w-4 h-4" />
+        <span className="text-sm">Purchase required to generate</span>
+      </div>
+    )
   }
 
   return (
@@ -282,28 +335,7 @@ export default function GenerateContractPage() {
                   <span>All fields are optional</span>
                 </div>
 
-                {!checkingSubscription && (
-                  <div className="border-t border-border pt-4 mt-4">
-                    {subscriptionStatus === "unlimited" ? (
-                      <div className="flex items-center gap-2 text-amber-500">
-                        <Crown className="w-4 h-4" />
-                        <span className="text-sm font-medium">Unlimited Plan Active</span>
-                      </div>
-                    ) : subscriptionStatus === "per_contract" && contractsRemaining > 0 ? (
-                      <div className="flex items-center gap-2 text-primary">
-                        <Zap className="w-4 h-4" />
-                        <span className="text-sm font-medium">
-                          {contractsRemaining} credit{contractsRemaining !== 1 ? "s" : ""} remaining
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Lock className="w-4 h-4" />
-                        <span className="text-sm">Purchase required to generate</span>
-                      </div>
-                    )}
-                  </div>
-                )}
+                {!checkingSubscription && <div className="border-t border-border pt-4 mt-4">{getStatusDisplay()}</div>}
 
                 <Button
                   variant="outline"
@@ -344,6 +376,9 @@ export default function GenerateContractPage() {
                     <Lock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                     <h3 className="text-xl font-semibold text-foreground mb-2">Purchase Required</h3>
                     <p className="text-muted-foreground">Choose a plan to generate this contract</p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Your free monthly contract has been used. It resets next month!
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-xl mx-auto">
@@ -400,7 +435,24 @@ export default function GenerateContractPage() {
                 </CardContent>
               </Card>
             ) : (
-              <ContractForm contract={contract} onSubmit={handleSubmit} isSubmitting={isSubmitting} />
+              <>
+                {freeContractAvailable && subscriptionStatus === "free" && (
+                  <Card className="bg-green-500/10 border-green-500/30 mb-6">
+                    <CardContent className="py-4">
+                      <div className="flex items-center gap-3">
+                        <Gift className="w-6 h-6 text-green-500" />
+                        <div>
+                          <p className="font-medium text-foreground">Free Contract Available!</p>
+                          <p className="text-sm text-muted-foreground">
+                            You have 1 free AI-generated contract this month. Use it wisely!
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                <ContractForm contract={contract} onSubmit={handleSubmit} isSubmitting={isSubmitting} />
+              </>
             )}
           </div>
         </div>

@@ -14,7 +14,7 @@ export async function POST() {
 
     const { data: profile } = await supabase
       .from("user_profiles")
-      .select("subscription_status, contracts_remaining, contracts_generated")
+      .select("subscription_status, contracts_remaining, contracts_generated, last_free_contract_at")
       .eq("user_id", user.id)
       .single()
 
@@ -32,7 +32,7 @@ export async function POST() {
         })
         .eq("user_id", user.id)
 
-      return NextResponse.json({ success: true })
+      return NextResponse.json({ success: true, usedFreeContract: false })
     }
 
     // Per-contract users need credits
@@ -49,6 +49,33 @@ export async function POST() {
       return NextResponse.json({
         success: true,
         contractsRemaining: profile.contracts_remaining - 1,
+        usedFreeContract: false,
+      })
+    }
+
+    const now = new Date()
+    const lastFreeContract = profile.last_free_contract_at ? new Date(profile.last_free_contract_at) : null
+
+    const isNewMonth =
+      !lastFreeContract ||
+      lastFreeContract.getMonth() !== now.getMonth() ||
+      lastFreeContract.getFullYear() !== now.getFullYear()
+
+    if (isNewMonth) {
+      // Use the free monthly contract
+      await supabase
+        .from("user_profiles")
+        .update({
+          contracts_generated: (profile.contracts_generated || 0) + 1,
+          last_free_contract_at: now.toISOString(),
+          updated_at: now.toISOString(),
+        })
+        .eq("user_id", user.id)
+
+      return NextResponse.json({
+        success: true,
+        usedFreeContract: true,
+        message: "Used your free monthly contract",
       })
     }
 
