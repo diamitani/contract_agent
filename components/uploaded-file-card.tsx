@@ -3,8 +3,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { FileText, Trash2, Download, Clock, FileIcon } from "lucide-react"
+import { FileText, Trash2, Eye, Clock, FileIcon, Sparkles } from "lucide-react"
 import type { UploadedFile } from "@/lib/contract-store"
+import Link from "next/link"
 
 interface UploadedFileCardProps {
   file: UploadedFile
@@ -32,9 +33,17 @@ export function UploadedFileCard({ file, onDelete }: UploadedFileCardProps) {
           <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center mb-3">
             <IconComponent className="w-5 h-5 text-accent" />
           </div>
-          <Badge variant="secondary" className="bg-secondary text-secondary-foreground">
-            {file.file_type.split("/")[1]?.toUpperCase() || "FILE"}
-          </Badge>
+          <div className="flex gap-2">
+            {file.analysis_status === "completed" && (
+              <Badge variant="default" className="bg-green-500/10 text-green-500 border-green-500/20">
+                <Sparkles className="w-3 h-3 mr-1" />
+                Analyzed
+              </Badge>
+            )}
+            <Badge variant="secondary" className="bg-secondary text-secondary-foreground">
+              {file.file_type.split("/")[1]?.toUpperCase() || "FILE"}
+            </Badge>
+          </div>
         </div>
         <CardTitle className="text-lg text-foreground group-hover:text-primary transition-colors line-clamp-1">
           {file.file_name}
@@ -57,10 +66,10 @@ export function UploadedFileCard({ file, onDelete }: UploadedFileCardProps) {
             Delete
           </Button>
           <Button size="sm" className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90" asChild>
-            <a href={file.storage_path} download={file.file_name} target="_blank" rel="noopener noreferrer">
-              <Download className="w-4 h-4 mr-2" />
-              Download
-            </a>
+            <Link href={`/files/${file.id}`}>
+              <Eye className="w-4 h-4 mr-2" />
+              View
+            </Link>
           </Button>
         </div>
       </CardContent>

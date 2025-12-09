@@ -1,8 +1,8 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Upload, FileText, X, Loader2 } from "lucide-react"
@@ -14,6 +14,7 @@ interface ContractUploadProps {
 }
 
 export function ContractUpload({ onUpload }: ContractUploadProps) {
+  const router = useRouter()
   const [isDragging, setIsDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -68,37 +69,30 @@ export function ContractUpload({ onUpload }: ContractUploadProps) {
         .from("contract-files")
         .upload(fileName, selectedFile)
 
+      let fileUrl = ""
+
       if (uploadError) {
         // If storage bucket doesn't exist, use a data URL as fallback
-        console.warn("Storage upload failed, using local reference:", uploadError)
-        const fileUrl = URL.createObjectURL(selectedFile)
-
-        const uploadedFile = await saveUploadedFile({
-          file_name: selectedFile.name,
-          file_type: selectedFile.type || `application/${fileExt}`,
-          file_size: selectedFile.size,
-          storage_path: fileUrl,
-        })
-
-        if (uploadedFile) {
-          onUpload(uploadedFile)
-        }
+        console.warn("Storage upload failed, using blob URL:", uploadError)
+        fileUrl = URL.createObjectURL(selectedFile)
       } else {
         // Get public URL
         const {
           data: { publicUrl },
         } = supabase.storage.from("contract-files").getPublicUrl(fileName)
+        fileUrl = publicUrl
+      }
 
-        const uploadedFile = await saveUploadedFile({
-          file_name: selectedFile.name,
-          file_type: selectedFile.type || `application/${fileExt}`,
-          file_size: selectedFile.size,
-          storage_path: publicUrl,
-        })
+      const uploadedFile = await saveUploadedFile({
+        file_name: selectedFile.name,
+        file_type: selectedFile.type || `application/${fileExt}`,
+        file_size: selectedFile.size,
+        storage_path: fileUrl,
+      })
 
-        if (uploadedFile) {
-          onUpload(uploadedFile)
-        }
+      if (uploadedFile) {
+        onUpload(uploadedFile)
+        router.push(`/files/${uploadedFile.id}`)
       }
     } catch (error) {
       console.error("Upload error:", error)
@@ -113,7 +107,7 @@ export function ContractUpload({ onUpload }: ContractUploadProps) {
       <CardHeader>
         <CardTitle className="text-foreground">Upload Contract for Review</CardTitle>
         <CardDescription className="text-muted-foreground">
-          Upload existing contracts to store them securely in your account
+          Upload contracts to store, analyze with AI, and get instant insights
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -147,7 +141,7 @@ export function ContractUpload({ onUpload }: ContractUploadProps) {
                 ) : (
                   <>
                     <Upload className="w-4 h-4 mr-2" />
-                    Upload File
+                    Upload & Analyze
                   </>
                 )}
               </Button>
