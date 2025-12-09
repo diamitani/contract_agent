@@ -35,7 +35,7 @@ export default function GenerateContractPage() {
   const [subscriptionStatus, setSubscriptionStatus] = useState<string>("free")
   const [contractsRemaining, setContractsRemaining] = useState(0)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [purchaseLoading, setPurchaseLoading] = useState(false)
+  const [purchaseLoadingType, setPurchaseLoadingType] = useState<"per_contract" | "unlimited" | null>(null)
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -90,7 +90,7 @@ export default function GenerateContractPage() {
       return
     }
 
-    setPurchaseLoading(true)
+    setPurchaseLoadingType(productType)
     try {
       const response = await fetch("/api/checkout", {
         method: "POST",
@@ -101,6 +101,8 @@ export default function GenerateContractPage() {
       const data = await response.json()
       if (data.url) {
         window.location.href = data.url
+      } else if (data.error) {
+        throw new Error(data.error)
       }
     } catch (error) {
       console.error("Purchase error:", error)
@@ -109,8 +111,7 @@ export default function GenerateContractPage() {
         description: "Failed to start checkout. Please try again.",
         variant: "destructive",
       })
-    } finally {
-      setPurchaseLoading(false)
+      setPurchaseLoadingType(null)
     }
   }
 
@@ -355,9 +356,13 @@ export default function GenerateContractPage() {
                         <Button
                           className="w-full bg-primary hover:bg-primary/90"
                           onClick={() => handlePurchase("per_contract")}
-                          disabled={purchaseLoading}
+                          disabled={purchaseLoadingType !== null}
                         >
-                          {purchaseLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Buy Now"}
+                          {purchaseLoadingType === "per_contract" ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            "Buy Now"
+                          )}
                         </Button>
                       </CardContent>
                     </Card>
@@ -373,9 +378,13 @@ export default function GenerateContractPage() {
                         <Button
                           className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-black"
                           onClick={() => handlePurchase("unlimited")}
-                          disabled={purchaseLoading}
+                          disabled={purchaseLoadingType !== null}
                         >
-                          {purchaseLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Subscribe"}
+                          {purchaseLoadingType === "unlimited" ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            "Subscribe"
+                          )}
                         </Button>
                       </CardContent>
                     </Card>

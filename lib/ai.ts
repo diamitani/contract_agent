@@ -3,22 +3,21 @@ import { createOpenAI } from "@ai-sdk/openai"
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ""
 
-function validateOpenAIKey(key: string): void {
+function getOpenAIClient() {
+  const key = process.env.OPENAI_API_KEY || OPENAI_API_KEY
+  
   if (!key) {
     throw new Error("OPENAI_API_KEY environment variable is required")
   }
+  
   if (key.startsWith("AIzaSy")) {
     throw new Error(
       "OPENAI_API_KEY appears to be a Google/Gemini API key. Please set a valid OpenAI API key (starts with 'sk-').",
     )
   }
+  
+  return createOpenAI({ apiKey: key })
 }
-
-validateOpenAIKey(OPENAI_API_KEY)
-
-const openai = createOpenAI({
-  apiKey: OPENAI_API_KEY,
-})
 
 export type AIModel = "openai" | "gemini"
 
@@ -35,7 +34,8 @@ export async function generateWithFallback(options: GenerateOptions): Promise<{
 }> {
   const { systemPrompt, userPrompt, maxOutputTokens = 4000, temperature = 0.3 } = options
 
-  const models = ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"]
+  const openai = getOpenAIClient()
+  const models = ["gpt-4o-mini", "gpt-3.5-turbo", "gpt-4o"]
 
   let lastError: Error | null = null
 
@@ -71,24 +71,31 @@ export async function generateChat(options: {
 }): Promise<string> {
   const { systemPrompt, messages, maxOutputTokens = 2000, temperature = 0.7 } = options
 
-  // Build conversation prompt
-  const conversationPrompt = messages
-    .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
-    .join("\n\n")
+  const openai = getOpenAIClient()
 
-  const result = await generateText({
-    model: openai("gpt-4o-mini"),
-    system: systemPrompt,
-    prompt: conversationPrompt + "\n\nAssistant:",
-    maxTokens: maxOutputTokens,
-    temperature,
-  })
+  try {
+    // Build conversation prompt for single-turn call
+    const conversationPrompt = messages
+      .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+      .join("\n\n")
 
-  return result.text
+    const result = await generateText({
+      model: openai("gpt-4o-mini"),
+      system: systemPrompt,
+      prompt: conversationPrompt + "\n\nAssistant:",
+      maxTokens: maxOutputTokens,
+      temperature,
+    })
+
+    return result.text || "I apologize, but I couldn't generate a response. Please try again."
+  } catch (error) {
+    console.error("[AI] Chat error:", error)
+    throw new Error(error instanceof Error ? error.message : "Failed to generate chat response")
+  }
 }
 
 export async function callOpenAI(endpoint: string, options: RequestInit): Promise<Response> {
-  const apiKey = OPENAI_API_KEY || process.env.OPENAI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY || OPENAI_API_KEY
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY environment variable is required")
   }
@@ -110,6 +117,8 @@ export async function callGeminiDirect(options: {
   maxTokens?: number
 }): Promise<string> {
   const { prompt, systemPrompt, maxTokens = 2000 } = options
+
+  const openai = getOpenAIClient()
 
   const result = await generateText({
     model: openai("gpt-4o-mini"),

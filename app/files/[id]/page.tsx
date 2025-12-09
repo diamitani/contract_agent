@@ -29,6 +29,10 @@ import {
   Clock,
   Shield,
   Sparkles,
+  Expand,
+  ZoomIn,
+  ZoomOut,
+  X,
 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
@@ -42,6 +46,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 interface UploadedFile {
   id: string
@@ -82,6 +87,10 @@ export default function FileViewerPage() {
   const [chatInput, setChatInput] = useState("")
   const [chatLoading, setChatLoading] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
+  const [pdfScale, setPdfScale] = useState(100)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [pdfLoading, setPdfLoading] = useState(true)
+  const [pdfError, setPdfError] = useState(false)
 
   const supabase = createBrowserClient()
 
@@ -214,30 +223,15 @@ export default function FileViewerPage() {
         }),
       })
 
-      if (response.ok) {
-        const contentType = response.headers.get("content-type") || ""
+      const data = await response.json()
 
-        if (contentType.includes("application/json")) {
-          const error = await response.json()
-          setChatMessages((prev) => [
-            ...prev,
-            { role: "assistant", content: `Error: ${error.error || "Failed to get response"}` },
-          ])
-        } else {
-          // Plain text response
-          const text = await response.text()
-          setChatMessages((prev) => [...prev, { role: "assistant", content: text }])
-        }
+      if (response.ok && data.response) {
+        setChatMessages((prev) => [...prev, { role: "assistant", content: data.response }])
       } else {
-        const errorText = await response.text()
-        let errorMessage = "Failed to get response"
-        try {
-          const errorJson = JSON.parse(errorText)
-          errorMessage = errorJson.error || errorMessage
-        } catch {
-          errorMessage = errorText || errorMessage
-        }
-        setChatMessages((prev) => [...prev, { role: "assistant", content: `Error: ${errorMessage}` }])
+        setChatMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: `Error: ${data.error || "Failed to get response"}` },
+        ])
       }
     } catch (error) {
       console.error("Chat error:", error)
@@ -262,51 +256,11 @@ export default function FileViewerPage() {
     return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
   }
 
-  const formatExtractedText = (text: string) => {
-    if (!text) return null
+  const isPdf = file?.file_type === "application/pdf" || file?.file_name?.toLowerCase().endsWith(".pdf")
 
-    // Check if the text is mostly gibberish
-    const readableChars = text.match(/[a-zA-Z]/g)?.length || 0
-    const totalChars = text.length
-    if (readableChars / totalChars < 0.3) {
-      return (
-        <div className="text-center py-8">
-          <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <p className="text-muted-foreground">Unable to extract readable text from this document.</p>
-          <p className="text-sm text-muted-foreground mt-2">
-            The document may be scanned or in a format that requires OCR processing.
-          </p>
-        </div>
-      )
-    }
-
-    // Split into paragraphs and format
-    const paragraphs = text.split(/\n\n+/).filter((p) => p.trim())
-
-    return paragraphs.map((paragraph, index) => {
-      const trimmed = paragraph.trim()
-
-      // Check if it looks like a heading
-      const isHeading =
-        trimmed.length < 100 &&
-        (/^[0-9]+\.?\s/.test(trimmed) ||
-          /^[A-Z][A-Z\s]+$/.test(trimmed) ||
-          /^(ARTICLE|SECTION|WHEREAS|NOW THEREFORE|RECITALS|AGREEMENT|CONTRACT)/i.test(trimmed))
-
-      if (isHeading) {
-        return (
-          <h3 key={index} className="font-semibold text-foreground mt-6 mb-2 text-base">
-            {trimmed}
-          </h3>
-        )
-      }
-
-      return (
-        <p key={index} className="text-sm text-muted-foreground mb-4 leading-relaxed">
-          {trimmed}
-        </p>
-      )
-    })
+  const getPdfViewerUrl = (url: string) => {
+    // Use Google Docs viewer for better compatibility
+    return `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`
   }
 
   if (loading) {
@@ -339,8 +293,162 @@ export default function FileViewerPage() {
     "What rights am I giving up by signing this?",
   ]
 
+  const PdfViewer = ({ fullscreen = false }: { fullscreen?: boolean }) => (
+    <div className={`relative ${fullscreen ? "h-[80vh]" : "h-[500px]"} bg-muted/30 rounded-lg overflow-hidden`}>
+      {/* PDF Controls */}
+      <div className="absolute top-2 right-2 z-10 flex items-center gap-1 bg-background/90 backdrop-blur rounded-lg p-1 shadow-lg">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => setPdfScale((s) => Math.max(50, s - 25))}
+          title="Zoom out"
+        >
+          <ZoomOut className="w-4 h-4" />
+        </Button>
+        <span className="text-xs font-medium px-2 min-w-[3rem] text-center">{pdfScale}%</span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => setPdfScale((s) => Math.min(200, s + 25))}
+          title="Zoom in"
+        >
+          <ZoomIn className="w-4 h-4" />
+        </Button>
+        {!fullscreen && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setIsFullscreen(true)}
+            title="Fullscreen"
+          >
+            <Expand className="w-4 h-4" />
+          </Button>
+        )}
+      </div>
+
+      {/* Loading state */}
+      {pdfLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-muted/50 z-5">
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">Loading document...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Error state */}
+      {pdfError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-muted/50 z-5">
+          <div className="text-center">
+            <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
+            <p className="text-muted-foreground mb-4">Unable to preview this document</p>
+            <Button asChild>
+              <a href={file.storage_path} download={file.file_name}>
+                <Download className="w-4 h-4 mr-2" />
+                Download Instead
+              </a>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* PDF iframe */}
+      <iframe
+        src={getPdfViewerUrl(file.storage_path)}
+        className="w-full h-full border-0"
+        style={{
+          transform: `scale(${pdfScale / 100})`,
+          transformOrigin: "top left",
+          width: `${10000 / pdfScale}%`,
+          height: `${10000 / pdfScale}%`,
+        }}
+        onLoad={() => {
+          setPdfLoading(false)
+          setPdfError(false)
+        }}
+        onError={() => {
+          setPdfLoading(false)
+          setPdfError(true)
+        }}
+        title={file.file_name}
+      />
+    </div>
+  )
+
+  const FilePreview = () => {
+    const isImage = file.file_type?.startsWith("image/")
+
+    if (isImage) {
+      return (
+        <div className="h-[500px] flex items-center justify-center bg-muted/30 rounded-lg overflow-hidden">
+          <img
+            src={file.storage_path || "/placeholder.svg"}
+            alt={file.file_name}
+            className="max-w-full max-h-full object-contain"
+          />
+        </div>
+      )
+    }
+
+    // For DOCX and other files, show download prompt
+    return (
+      <div className="h-[300px] border rounded-lg flex items-center justify-center bg-muted/30">
+        <div className="text-center">
+          <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
+          <p className="text-muted-foreground mb-2">Preview not available for this file type</p>
+          <p className="text-sm text-muted-foreground mb-4">
+            Click "Analyze Document" to extract text, or download the file to view it
+          </p>
+          <div className="flex items-center justify-center gap-2">
+            <Button asChild variant="outline">
+              <a href={file.storage_path} download={file.file_name}>
+                <Download className="w-4 h-4 mr-2" />
+                Download
+              </a>
+            </Button>
+            <Button onClick={handleAnalyze} disabled={analyzing}>
+              {analyzing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Analyze
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background">
+      <Dialog open={isFullscreen} onOpenChange={setIsFullscreen}>
+        <DialogContent className="max-w-[95vw] w-full h-[90vh] p-0">
+          <DialogHeader className="p-4 pb-0 flex flex-row items-center justify-between">
+            <DialogTitle className="truncate pr-8">{file.file_name}</DialogTitle>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-4 top-4"
+              onClick={() => setIsFullscreen(false)}
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </DialogHeader>
+          <div className="p-4 pt-2 h-full">
+            <PdfViewer fullscreen />
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Header */}
       <div className="border-b bg-card">
         <div className="container mx-auto px-4 py-4">
@@ -455,30 +563,12 @@ export default function FileViewerPage() {
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4 mr-2" />
-                      {file.extracted_text ? "Re-analyze" : "Analyze Document"}
+                      {file.analysis_result ? "Re-analyze" : "Analyze Document"}
                     </>
                   )}
                 </Button>
               </CardHeader>
-              <CardContent>
-                {file.extracted_text ? (
-                  <ScrollArea className="h-[500px] border rounded-lg p-6 bg-muted/30">
-                    <div className="prose prose-sm max-w-none dark:prose-invert">
-                      {formatExtractedText(file.extracted_text)}
-                    </div>
-                  </ScrollArea>
-                ) : (
-                  <div className="h-[300px] border rounded-lg flex items-center justify-center bg-muted/30">
-                    <div className="text-center">
-                      <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
-                      <p className="text-muted-foreground mb-2">Document not yet analyzed</p>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Click "Analyze Document" to extract text and get AI insights
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
+              <CardContent>{isPdf ? <PdfViewer /> : <FilePreview />}</CardContent>
             </Card>
 
             {/* Contract Overview Card */}

@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server"
+import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { generateChat } from "@/lib/ai"
 
@@ -12,10 +13,7 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const analysisContext = analysis
@@ -63,18 +61,12 @@ Provide helpful, accurate, and clear answers about this contract.`
       temperature: 0.7,
     })
 
-    // Return as plain text for simple client-side handling
-    return new Response(responseText, {
-      headers: { "Content-Type": "text/plain" },
-    })
+    return NextResponse.json({ response: responseText })
   } catch (error) {
     console.error("Chat error:", error)
-    return new Response(
-      JSON.stringify({ error: "Chat failed: " + (error instanceof Error ? error.message : "Unknown error") }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      },
+    return NextResponse.json(
+      { error: "Chat failed: " + (error instanceof Error ? error.message : "Unknown error") },
+      { status: 500 },
     )
   }
 }
