@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useParams } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useParams, useRouter } from "next/navigation"
 import { Header } from "@/components/header"
 import { ContractForm } from "@/components/contract-form"
 import { GeneratedContractModal } from "@/components/generated-contract-modal"
@@ -11,12 +11,14 @@ import { saveContract } from "@/lib/contract-store"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, FileText, Eye, Info } from "lucide-react"
+import { ArrowLeft, FileText, Eye, Info, Lock, Zap, Crown, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
+import { createBrowserClient } from "@supabase/ssr"
 
 export default function GenerateContractPage() {
   const params = useParams()
+  const router = useRouter()
   const slug = params.slug as string
   const { toast } = useToast()
   const contract = getContractBySlug(slug)
@@ -27,6 +29,46 @@ export default function GenerateContractPage() {
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
+
+  const [checkingSubscription, setCheckingSubscription] = useState(true)
+  const [canGenerate, setCanGenerate] = useState(false)
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string>("free")
+  const [contractsRemaining, setContractsRemaining] = useState(0)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [purchaseLoading, setPurchaseLoading] = useState(false)
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  )
+
+  useEffect(() => {
+    const checkAccess = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      setIsLoggedIn(!!user)
+
+      if (!user) {
+        setCheckingSubscription(false)
+        return
+      }
+
+      try {
+        const res = await fetch("/api/check-subscription")
+        const data = await res.json()
+        setCanGenerate(data.canGenerate)
+        setSubscriptionStatus(data.status)
+        setContractsRemaining(data.contractsRemaining || 0)
+      } catch (error) {
+        console.error("Failed to check subscription:", error)
+      }
+
+      setCheckingSubscription(false)
+    }
+
+    checkAccess()
+  }, [supabase.auth])
 
   if (!contract) {
     return (
@@ -42,13 +84,55 @@ export default function GenerateContractPage() {
     )
   }
 
+  const handlePurchase = async (productType: "per_contract" | "unlimited") => {
+    if (!isLoggedIn) {
+      router.push(`/auth/sign-in?redirect=/generate/${slug}`)
+      return
+    }
+
+    setPurchaseLoading(true)
+    try {
+      const response = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productType, contractSlug: slug }),
+      })
+
+      const data = await response.json()
+      if (data.url) {
+        window.location.href = data.url
+      }
+    } catch (error) {
+      console.error("Purchase error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to start checkout. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setPurchaseLoading(false)
+    }
+  }
+
   const handleSubmit = async (formData: Record<string, string>) => {
+    if (!canGenerate) {
+      toast({
+        title: "Subscription Required",
+        description: "Please purchase a plan to generate contracts.",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsSubmitting(true)
     setGeneratedContent("")
     setIsStreaming(true)
     setGeneratedModalOpen(true)
 
     try {
+      // Use a contract credit first
+      await fetch("/api/use-contract-credit", { method: "POST" })
+
       const response = await fetch("/api/generate-contract", {
         method: "POST",
         headers: {
@@ -124,11 +208,14 @@ export default function GenerateContractPage() {
             title: "Contract Generated & Saved!",
             description: "Your contract has been saved to your dashboard.",
           })
-        } else {
-          toast({
-            title: "Contract Generated!",
-            description: "Sign in to save contracts to your dashboard.",
-          })
+        }
+
+        // Update remaining credits display
+        if (subscriptionStatus === "per_contract") {
+          setContractsRemaining((prev) => Math.max(0, prev - 1))
+          if (contractsRemaining <= 1) {
+            setCanGenerate(false)
+          }
         }
       }
     } catch (error) {
@@ -139,7 +226,6 @@ export default function GenerateContractPage() {
       const mockContent = generateMockContract(contract.name, formData)
       setGeneratedContent(mockContent)
 
-      // Try to save the mock contract too
       await saveContract({
         title: contract.name,
         contract_type: contract.slug,
@@ -194,6 +280,30 @@ export default function GenerateContractPage() {
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span>All fields are optional</span>
                 </div>
+
+                {!checkingSubscription && (
+                  <div className="border-t border-border pt-4 mt-4">
+                    {subscriptionStatus === "unlimited" ? (
+                      <div className="flex items-center gap-2 text-amber-500">
+                        <Crown className="w-4 h-4" />
+                        <span className="text-sm font-medium">Unlimited Plan Active</span>
+                      </div>
+                    ) : subscriptionStatus === "per_contract" && contractsRemaining > 0 ? (
+                      <div className="flex items-center gap-2 text-primary">
+                        <Zap className="w-4 h-4" />
+                        <span className="text-sm font-medium">
+                          {contractsRemaining} credit{contractsRemaining !== 1 ? "s" : ""} remaining
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Lock className="w-4 h-4" />
+                        <span className="text-sm">Purchase required to generate</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <Button
                   variant="outline"
                   className="w-full border-border hover:bg-secondary bg-transparent"
@@ -208,7 +318,81 @@ export default function GenerateContractPage() {
 
           {/* Form Section */}
           <div className="lg:col-span-2">
-            <ContractForm contract={contract} onSubmit={handleSubmit} isSubmitting={isSubmitting} />
+            {checkingSubscription ? (
+              <Card className="bg-card border-border">
+                <CardContent className="py-12 text-center">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+                  <p className="text-muted-foreground">Checking subscription...</p>
+                </CardContent>
+              </Card>
+            ) : !isLoggedIn ? (
+              <Card className="bg-card border-border">
+                <CardContent className="py-12 text-center">
+                  <Lock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-foreground mb-2">Sign In Required</h3>
+                  <p className="text-muted-foreground mb-6">Please sign in to generate contracts</p>
+                  <Button asChild className="bg-primary hover:bg-primary/90">
+                    <Link href={`/auth/sign-in?redirect=/generate/${slug}`}>Sign In to Continue</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : !canGenerate ? (
+              <Card className="bg-card border-border">
+                <CardContent className="py-12">
+                  <div className="text-center mb-8">
+                    <Lock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-foreground mb-2">Purchase Required</h3>
+                    <p className="text-muted-foreground">Choose a plan to generate this contract</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-xl mx-auto">
+                    <Card className="bg-secondary/30 border-border">
+                      <CardContent className="pt-6 text-center">
+                        <Zap className="w-8 h-8 text-primary mx-auto mb-3" />
+                        <h4 className="font-semibold text-foreground mb-1">Single Contract</h4>
+                        <p className="text-2xl font-bold text-foreground mb-2">$9.99</p>
+                        <p className="text-sm text-muted-foreground mb-4">One-time purchase</p>
+                        <Button
+                          className="w-full bg-primary hover:bg-primary/90"
+                          onClick={() => handlePurchase("per_contract")}
+                          disabled={purchaseLoading}
+                        >
+                          {purchaseLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Buy Now"}
+                        </Button>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-secondary/30 border-primary/50 border-2">
+                      <CardContent className="pt-6 text-center">
+                        <Crown className="w-8 h-8 text-amber-500 mx-auto mb-3" />
+                        <h4 className="font-semibold text-foreground mb-1">Unlimited</h4>
+                        <p className="text-2xl font-bold text-foreground mb-2">
+                          $19.99<span className="text-sm font-normal">/mo</span>
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-4">Best value</p>
+                        <Button
+                          className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-black"
+                          onClick={() => handlePurchase("unlimited")}
+                          disabled={purchaseLoading}
+                        >
+                          {purchaseLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Subscribe"}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <p className="text-center text-sm text-muted-foreground mt-6">
+                    Or{" "}
+                    <Link href={`/templates`} className="text-primary hover:underline">
+                      download the free template
+                    </Link>{" "}
+                    without AI customization
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <ContractForm contract={contract} onSubmit={handleSubmit} isSubmitting={isSubmitting} />
+            )}
           </div>
         </div>
       </div>

@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { Sparkles, LayoutDashboard, Home, LogOut, User } from "lucide-react"
+import { Sparkles, LayoutDashboard, Home, LogOut, User, FileText, CreditCard } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -73,16 +73,25 @@ export function Header() {
             }`}
           >
             <Home className="w-4 h-4" />
+            Generate
+          </Link>
+          <Link
+            href="/templates"
+            className={`text-sm flex items-center gap-2 transition-colors ${
+              pathname === "/templates" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <FileText className="w-4 h-4" />
             Templates
           </Link>
           <Link
-            href="/dashboard"
+            href="/pricing"
             className={`text-sm flex items-center gap-2 transition-colors ${
-              pathname === "/dashboard" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+              pathname === "/pricing" ? "text-primary" : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <LayoutDashboard className="w-4 h-4" />
-            Dashboard
+            <CreditCard className="w-4 h-4" />
+            Pricing
           </Link>
           <div className="flex items-center gap-2 text-accent">
             <Sparkles className="w-4 h-4" />
