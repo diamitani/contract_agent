@@ -1,15 +1,6 @@
 import type { NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { streamText } from "ai"
-import { createOpenAI } from "@ai-sdk/openai"
-import { createGoogleGenerativeAI } from "@ai-sdk/google"
-
-const OPENAI_API_KEY =
-  "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"
-const GOOGLE_API_KEY = process.env.GOOGLE_GENERATIVE_AI_API_KEY || ""
-
-const openai = createOpenAI({ apiKey: OPENAI_API_KEY })
-const google = createGoogleGenerativeAI({ apiKey: GOOGLE_API_KEY })
+import { streamGeminiChat } from "@/lib/ai"
 
 export async function POST(request: NextRequest) {
   try {
@@ -54,41 +45,25 @@ ${analysisContext}
 Remember: You are helping them understand their contract, not providing legal advice. For important decisions, always recommend consulting with a qualified attorney.`
 
     const messages = [
-      { role: "system" as const, content: systemPrompt },
       ...(history || []).map((msg: { role: string; content: string }) => ({
-        role: msg.role as "user" | "assistant",
+        role: msg.role,
         content: msg.content,
       })),
-      { role: "user" as const, content: message },
+      { role: "user", content: message },
     ]
 
-    try {
-      const result = streamText({
-        model: openai("gpt-4o-mini"),
-        messages,
-        maxTokens: 1500,
-        temperature: 0.7,
-      })
+    const stream = await streamGeminiChat({
+      systemPrompt,
+      messages,
+      maxTokens: 1500,
+    })
 
-      console.log("[AI] Chat using OpenAI")
-      return result.toTextStreamResponse()
-    } catch (openaiError) {
-      console.log("[AI] OpenAI failed, trying Gemini:", openaiError)
-
-      if (GOOGLE_API_KEY) {
-        const result = streamText({
-          model: google("gemini-2.0-flash"),
-          messages,
-          maxTokens: 1500,
-          temperature: 0.7,
-        })
-
-        console.log("[AI] Chat using Gemini")
-        return result.toTextStreamResponse()
-      }
-
-      throw openaiError
-    }
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Transfer-Encoding": "chunked",
+      },
+    })
   } catch (error) {
     console.error("Chat error:", error)
     return new Response("Chat failed: " + (error instanceof Error ? error.message : "Unknown error"), { status: 500 })

@@ -60,40 +60,67 @@ async function extractTextFromFile(buffer: ArrayBuffer, contentType: string, fil
     }
   }
 
-  // Handle PDF files - extract text between stream markers
+  // Handle PDF files - use pdf-parse style extraction
   if (fileNameLower.endsWith(".pdf") || contentType.includes("pdf")) {
     try {
-      const text = new TextDecoder("utf-8", { fatal: false }).decode(buffer)
+      const uint8Array = new Uint8Array(buffer)
+      const text = new TextDecoder("utf-8", { fatal: false }).decode(uint8Array)
 
-      // Try to find text in PDF streams
-      const textMatches: string[] = []
+      // Extract text between BT and ET markers (text objects in PDF)
+      const textParts: string[] = []
 
-      // Look for text in parentheses (common PDF text format)
-      const parenRegex = /$$([^)]+)$$/g
-      let match
-      while ((match = parenRegex.exec(text)) !== null) {
+      // Method 1: Look for text in parentheses after text operators
+      const parenMatches = text.matchAll(/$$([^)\\]*(?:\\.[^)\\]*)*)$$/g)
+      for (const match of parenMatches) {
         const content = match[1]
-        // Filter out binary/control sequences
-        if (content.length > 2 && /[a-zA-Z]{2,}/.test(content)) {
-          textMatches.push(content)
+          .replace(/\\n/g, "\n")
+          .replace(/\\r/g, "\r")
+          .replace(/\\t/g, "\t")
+          .replace(/\\\(/g, "(")
+          .replace(/\\\)/g, ")")
+          .replace(/\\\\/g, "\\")
+
+        // Only keep if it has readable content
+        if (content.length > 1 && /[a-zA-Z]{2,}/.test(content)) {
+          textParts.push(content)
         }
       }
 
-      // Also look for text after Tj/TJ operators
-      const tjRegex = /\[([^\]]+)\]\s*TJ/g
-      while ((match = tjRegex.exec(text)) !== null) {
-        const content = match[1]
-          .replace(/$$[^)]*$$/g, (m) => m.slice(1, -1))
-          .replace(/[-\d]+/g, " ")
+      // Method 2: Look for hex strings
+      const hexMatches = text.matchAll(/<([0-9A-Fa-f]+)>/g)
+      for (const match of hexMatches) {
+        try {
+          const hex = match[1]
+          if (hex.length % 2 === 0 && hex.length >= 4) {
+            let decoded = ""
+            for (let i = 0; i < hex.length; i += 2) {
+              const charCode = Number.parseInt(hex.substr(i, 2), 16)
+              if (charCode >= 32 && charCode <= 126) {
+                decoded += String.fromCharCode(charCode)
+              }
+            }
+            if (decoded.length > 2 && /[a-zA-Z]{2,}/.test(decoded)) {
+              textParts.push(decoded)
+            }
+          }
+        } catch {}
+      }
+
+      if (textParts.length > 0) {
+        // Join and clean up the extracted text
+        return textParts
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .replace(/([.!?])\s*/g, "$1\n\n")
           .trim()
-        if (content.length > 2) {
-          textMatches.push(content)
-        }
       }
 
-      if (textMatches.length > 0) {
-        return textMatches.join(" ").replace(/\s+/g, " ").trim()
-      }
+      // Fallback: just extract any printable ASCII
+      return text
+        .replace(/[^\x20-\x7E\n\r]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 15000)
     } catch (pdfError) {
       console.error("[v0] PDF extraction failed:", pdfError)
     }
@@ -160,7 +187,7 @@ export async function POST(request: NextRequest) {
 
 Your analysis MUST include:
 1. **Contract Type**: What kind of contract is this? (e.g., Employment Agreement, NDA, Recording Contract, Production Agreement, etc.)
-2. **Parties Involved**: List ALL parties mentioned with their roles (e.g., "Artist: John Smith", "Label: XYZ Records LLC", "Producer: Jane Doe")
+2. **Parties Involved**: List ALL parties mentioned with their roles. Look for names, company names, "Party A", "Party B", "Artist", "Producer", "Label", etc.
 3. **Summary**: A clear 3-4 sentence overview of what this contract is about, its main purpose, and what it accomplishes
 4. **Key Terms**: Important definitions, percentages, payment amounts, royalty rates, or specific terms defined in the contract
 5. **Obligations**: What each party is required to do under this agreement
@@ -171,11 +198,13 @@ Your analysis MUST include:
 10. **Risks & Concerns**: Potential red flags, unfavorable terms, or areas that might need negotiation
 11. **Important Dates**: Any deadlines, effective dates, or time-sensitive provisions
 
+IMPORTANT: If you cannot find specific information, provide your best interpretation based on the document type. Do NOT leave fields empty.
+
 Respond ONLY in this exact JSON format:
 {
   "contract_type": "Type of contract",
   "parties": [
-    {"name": "Party name or placeholder", "role": "Their role in the contract"}
+    {"name": "Party name or description", "role": "Their role in the contract"}
   ],
   "summary": "Comprehensive 3-4 sentence summary of the contract",
   "key_terms": ["term1: explanation", "term2: explanation"],
