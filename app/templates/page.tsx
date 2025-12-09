@@ -50,6 +50,20 @@ export default function TemplatesPage() {
     setPreviewOpen(true)
   }
 
+  const handlePreviewDownload = () => {
+    if (previewContract) {
+      const contract = previewContract
+      setPreviewOpen(false)
+      // Use setTimeout to ensure preview modal closes before opening email modal
+      setTimeout(() => {
+        setDownloadContract(contract)
+        setEmailCaptureOpen(true)
+        setDownloadSuccess(false)
+        setErrorMessage("")
+      }, 100)
+    }
+  }
+
   const generateTemplateText = (contract: ContractTemplate) => {
     const sections = [
       {
@@ -493,13 +507,7 @@ Date                                       Date`,
             <Button variant="outline" className="flex-1 bg-transparent" onClick={() => setPreviewOpen(false)}>
               Close
             </Button>
-            <Button
-              className="flex-1"
-              onClick={() => {
-                setPreviewOpen(false)
-                if (previewContract) handleDownloadClick(previewContract)
-              }}
-            >
+            <Button className="flex-1" onClick={handlePreviewDownload}>
               <Download className="w-4 h-4 mr-2" />
               Download Template
             </Button>

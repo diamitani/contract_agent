@@ -28,12 +28,12 @@ export function UploadedFileCard({ file, onDelete }: UploadedFileCardProps) {
 
   return (
     <Card className="bg-card border-border hover:border-primary/50 transition-all duration-300 group">
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center mb-3">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
             <IconComponent className="w-5 h-5 text-accent" />
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap justify-end">
             {file.analysis_status === "completed" && (
               <Badge variant="default" className="bg-green-500/10 text-green-500 border-green-500/20">
                 <Sparkles className="w-3 h-3 mr-1" />
@@ -45,10 +45,15 @@ export function UploadedFileCard({ file, onDelete }: UploadedFileCardProps) {
             </Badge>
           </div>
         </div>
-        <CardTitle className="text-lg text-foreground group-hover:text-primary transition-colors line-clamp-1">
-          {file.file_name}
-        </CardTitle>
-        <CardDescription className="text-muted-foreground">{formatFileSize(file.file_size)}</CardDescription>
+        <div className="min-w-0 mt-3">
+          <CardTitle
+            className="text-lg text-foreground group-hover:text-primary transition-colors truncate"
+            title={file.file_name}
+          >
+            {file.file_name}
+          </CardTitle>
+          <CardDescription className="text-muted-foreground">{formatFileSize(file.file_size)}</CardDescription>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">

@@ -1,13 +1,19 @@
 import { generateText, streamText } from "ai"
+import { createOpenAI } from "@ai-sdk/openai"
+import { createGoogleGenerativeAI } from "@ai-sdk/google"
 
 const OPENAI_API_KEY =
   "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"
 
-// Models with fallback order
-const MODELS = {
-  primary: "openai/gpt-4o-mini",
-  fallback: "google/gemini-2.0-flash",
-} as const
+// Create OpenAI provider with your API key
+const openai = createOpenAI({
+  apiKey: OPENAI_API_KEY,
+})
+
+// Create Google provider (uses GOOGLE_GENERATIVE_AI_API_KEY env var if set)
+const google = createGoogleGenerativeAI({
+  apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || "",
+})
 
 export type AIModel = "openai" | "gemini"
 
@@ -29,13 +35,12 @@ export async function generateWithFallback(options: GenerateOptions): Promise<{
 }> {
   const { systemPrompt, userPrompt, maxOutputTokens = 2000, temperature = 0.7 } = options
 
-  // Try primary model first (OpenAI)
   try {
     const result = await generateText({
-      model: MODELS.primary,
+      model: openai("gpt-4o-mini"),
       system: systemPrompt,
       prompt: userPrompt,
-      maxOutputTokens,
+      maxTokens: maxOutputTokens,
       temperature,
     })
     return { text: result.text, model: "openai" }
@@ -43,13 +48,12 @@ export async function generateWithFallback(options: GenerateOptions): Promise<{
     console.log("[AI] OpenAI failed, falling back to Gemini:", openaiError)
   }
 
-  // Fallback to Gemini
   try {
     const result = await generateText({
-      model: MODELS.fallback,
+      model: google("gemini-1.5-flash"),
       system: systemPrompt,
       prompt: userPrompt,
-      maxOutputTokens,
+      maxTokens: maxOutputTokens,
       temperature,
     })
     return { text: result.text, model: "gemini" }
@@ -66,13 +70,12 @@ export async function streamWithFallback(options: StreamOptions): Promise<{
 }> {
   const { systemPrompt, userPrompt, maxOutputTokens = 2000, temperature = 0.7 } = options
 
-  // Try primary model first (OpenAI)
   try {
     const result = streamText({
-      model: MODELS.primary,
+      model: openai("gpt-4o-mini"),
       system: systemPrompt,
       prompt: userPrompt,
-      maxOutputTokens,
+      maxTokens: maxOutputTokens,
       temperature,
     })
     return { stream: result.toDataStream(), model: "openai" }
@@ -80,13 +83,12 @@ export async function streamWithFallback(options: StreamOptions): Promise<{
     console.log("[AI] OpenAI streaming failed, falling back to Gemini:", openaiError)
   }
 
-  // Fallback to Gemini
   try {
     const result = streamText({
-      model: MODELS.fallback,
+      model: google("gemini-1.5-flash"),
       system: systemPrompt,
       prompt: userPrompt,
-      maxOutputTokens,
+      maxTokens: maxOutputTokens,
       temperature,
     })
     return { stream: result.toDataStream(), model: "gemini" }
@@ -150,10 +152,10 @@ export async function callGeminiDirect(options: {
   const { prompt, systemPrompt, maxTokens = 2000 } = options
 
   const result = await generateText({
-    model: MODELS.fallback,
+    model: google("gemini-1.5-flash"),
     system: systemPrompt,
     prompt,
-    maxOutputTokens: maxTokens,
+    maxTokens: maxTokens,
   })
 
   return result.text

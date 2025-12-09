@@ -1,9 +1,8 @@
 "use client"
 
 import type React from "react"
-
-import { useState, useEffect, use } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, useParams } from "next/navigation"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,8 +32,9 @@ import { createClient } from "@/lib/supabase/client"
 import type { UploadedFile, Folder } from "@/lib/contract-store"
 import { updateUploadedFile, deleteUploadedFile, getFolders } from "@/lib/contract-store"
 
-export default function FileViewerPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params)
+export default function FileViewerPage() {
+  const params = useParams()
+  const id = params.id as string
   const router = useRouter()
   const [file, setFile] = useState<UploadedFile | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
