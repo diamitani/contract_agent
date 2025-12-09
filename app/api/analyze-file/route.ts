@@ -17,110 +17,74 @@ async function extractTextFromFile(buffer: ArrayBuffer, contentType: string, fil
       if (documentXml) {
         // Extract text from XML, removing all tags
         const text = documentXml
-          // Remove XML declaration and processing instructions
           .replace(/<\?[^?]*\?>/g, "")
-          // Extract text from w:t tags (Word text elements)
-          .replace(/<w:t[^>]*>([^<]*)<\/w:t>/g, "$1")
-          // Handle paragraph breaks
+          .replace(/<w:t[^>]*>([^<]*)<\/w:t>/g, "$1 ")
           .replace(/<\/w:p>/g, "\n\n")
-          // Handle line breaks
           .replace(/<w:br[^>]*\/>/g, "\n")
-          // Remove all remaining XML tags
           .replace(/<[^>]+>/g, "")
-          // Decode HTML entities
           .replace(/&amp;/g, "&")
           .replace(/&lt;/g, "<")
           .replace(/&gt;/g, ">")
           .replace(/&quot;/g, '"')
           .replace(/&apos;/g, "'")
-          // Clean up whitespace
           .replace(/\n{3,}/g, "\n\n")
           .trim()
 
-        return text
+        if (text.length > 100) {
+          return text
+        }
       }
     } catch (zipError) {
       console.error("[v0] DOCX extraction failed:", zipError)
     }
   }
 
-  // Handle DOC files (older Word format) - basic text extraction
-  if (fileNameLower.endsWith(".doc") || contentType.includes("msword")) {
-    try {
-      const text = new TextDecoder("utf-8", { fatal: false }).decode(buffer)
-      // Try to extract readable text from binary
-      const cleanText = text
-        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, " ")
-        .replace(/[^\x20-\x7E\n\r\t\u00A0-\u024F]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim()
-      return cleanText
-    } catch (docError) {
-      console.error("[v0] DOC extraction failed:", docError)
-    }
-  }
-
-  // Handle PDF files - use pdf-parse style extraction
+  // Handle PDF files - improved extraction
   if (fileNameLower.endsWith(".pdf") || contentType.includes("pdf")) {
     try {
       const uint8Array = new Uint8Array(buffer)
-      const text = new TextDecoder("utf-8", { fatal: false }).decode(uint8Array)
+      const text = new TextDecoder("latin1").decode(uint8Array)
 
-      // Extract text between BT and ET markers (text objects in PDF)
-      const textParts: string[] = []
+      const extractedParts: string[] = []
 
-      // Method 1: Look for text in parentheses after text operators
-      const parenMatches = text.matchAll(/$$([^)\\]*(?:\\.[^)\\]*)*)$$/g)
-      for (const match of parenMatches) {
-        const content = match[1]
-          .replace(/\\n/g, "\n")
-          .replace(/\\r/g, "\r")
-          .replace(/\\t/g, "\t")
-          .replace(/\\\(/g, "(")
-          .replace(/\\\)/g, ")")
-          .replace(/\\\\/g, "\\")
-
-        // Only keep if it has readable content
-        if (content.length > 1 && /[a-zA-Z]{2,}/.test(content)) {
-          textParts.push(content)
+      // Method 1: Extract text between BT and ET markers (text objects)
+      const btEtRegex = /BT\s*([\s\S]*?)\s*ET/g
+      let match
+      while ((match = btEtRegex.exec(text)) !== null) {
+        const textBlock = match[1]
+        // Extract text from Tj and TJ operators
+        const tjMatches = textBlock.match(/$$([^)]+)$$\s*Tj/g) || []
+        for (const tj of tjMatches) {
+          const content = tj.match(/$$([^)]+)$$/)?.[1] || ""
+          if (content && content.length > 1 && /[a-zA-Z]/.test(content)) {
+            extractedParts.push(content)
+          }
         }
       }
 
-      // Method 2: Look for hex strings
-      const hexMatches = text.matchAll(/<([0-9A-Fa-f]+)>/g)
-      for (const match of hexMatches) {
-        try {
-          const hex = match[1]
-          if (hex.length % 2 === 0 && hex.length >= 4) {
-            let decoded = ""
-            for (let i = 0; i < hex.length; i += 2) {
-              const charCode = Number.parseInt(hex.substr(i, 2), 16)
-              if (charCode >= 32 && charCode <= 126) {
-                decoded += String.fromCharCode(charCode)
-              }
-            }
-            if (decoded.length > 2 && /[a-zA-Z]{2,}/.test(decoded)) {
-              textParts.push(decoded)
-            }
-          }
-        } catch {}
+      // Method 2: Look for readable strings
+      const stringRegex = /$$([A-Za-z][A-Za-z0-9\s,.'"-]{3,})$$/g
+      while ((match = stringRegex.exec(text)) !== null) {
+        const content = match[1].trim()
+        if (content.length > 3 && /[a-zA-Z]{2,}/.test(content)) {
+          extractedParts.push(content)
+        }
       }
 
-      if (textParts.length > 0) {
-        // Join and clean up the extracted text
-        return textParts
-          .join(" ")
+      if (extractedParts.length > 10) {
+        return extractedParts.join(" ").replace(/\s+/g, " ").trim()
+      }
+
+      // Method 3: Just find any readable text sequences
+      const readableText =
+        text
+          .replace(/[^\x20-\x7E\n]/g, " ")
           .replace(/\s+/g, " ")
-          .replace(/([.!?])\s*/g, "$1\n\n")
-          .trim()
-      }
+          .match(/[A-Za-z][A-Za-z0-9\s,.'"-]{10,}/g) || []
 
-      // Fallback: just extract any printable ASCII
-      return text
-        .replace(/[^\x20-\x7E\n\r]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, 15000)
+      if (readableText.length > 5) {
+        return readableText.join(" ").trim()
+      }
     } catch (pdfError) {
       console.error("[v0] PDF extraction failed:", pdfError)
     }
@@ -131,13 +95,30 @@ async function extractTextFromFile(buffer: ArrayBuffer, contentType: string, fil
     return new TextDecoder("utf-8").decode(buffer)
   }
 
-  // Fallback: try to extract any readable text
+  // Handle DOC files (older Word format)
+  if (fileNameLower.endsWith(".doc") || contentType.includes("msword")) {
+    try {
+      const text = new TextDecoder("utf-8", { fatal: false }).decode(buffer)
+      const cleanText =
+        text
+          .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, " ")
+          .replace(/[^\x20-\x7E\n\r\t\u00A0-\u024F]/g, " ")
+          .match(/[A-Za-z][A-Za-z0-9\s,.'"-]{5,}/g) || []
+
+      return cleanText.join(" ").replace(/\s+/g, " ").trim()
+    } catch (docError) {
+      console.error("[v0] DOC extraction failed:", docError)
+    }
+  }
+
+  // Fallback: extract any readable text
   const text = new TextDecoder("utf-8", { fatal: false }).decode(buffer)
-  return text
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, " ")
+  const readable = text
+    .replace(/[^\x20-\x7E\n]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, 15000)
+
+  return readable.slice(0, 15000)
 }
 
 export async function POST(request: NextRequest) {
@@ -153,21 +134,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get file info for the filename
+    // Get file info
     const { data: fileInfo } = await supabase
       .from("uploaded_files")
       .select("file_name, file_type")
       .eq("id", fileId)
       .single()
 
-    // Update status to analyzing
+    // Update status
     await supabase
       .from("uploaded_files")
       .update({ analysis_status: "analyzing" })
       .eq("id", fileId)
       .eq("user_id", user.id)
 
-    // Fetch the file content
+    // Fetch and extract text
     let extractedText = ""
 
     try {
@@ -178,54 +159,81 @@ export async function POST(request: NextRequest) {
       extractedText = await extractTextFromFile(buffer, contentType, fileInfo?.file_name || storagePath)
 
       console.log(`[v0] Extracted ${extractedText.length} characters from ${fileInfo?.file_name}`)
+
+      // If extraction failed or got gibberish, note it
+      if (extractedText.length < 100 || !/[a-zA-Z]{3,}/.test(extractedText)) {
+        extractedText =
+          "Unable to extract readable text from this file format. The document may be scanned or use a format that requires OCR."
+      }
     } catch (fetchError) {
       console.error("Error fetching file:", fetchError)
-      extractedText = "Unable to extract text from file."
+      extractedText = "Unable to fetch file content."
     }
 
-    const systemPrompt = `You are an expert legal contract analyst. Analyze the following contract thoroughly and provide a comprehensive breakdown.
+    const systemPrompt = `You are an expert legal contract analyst specializing in entertainment, music, and business contracts. Analyze the contract text thoroughly and extract ALL specific details.
 
-Your analysis MUST include:
-1. **Contract Type**: What kind of contract is this? (e.g., Employment Agreement, NDA, Recording Contract, Production Agreement, etc.)
-2. **Parties Involved**: List ALL parties mentioned with their roles. Look for names, company names, "Party A", "Party B", "Artist", "Producer", "Label", etc.
-3. **Summary**: A clear 3-4 sentence overview of what this contract is about, its main purpose, and what it accomplishes
-4. **Key Terms**: Important definitions, percentages, payment amounts, royalty rates, or specific terms defined in the contract
-5. **Obligations**: What each party is required to do under this agreement
-6. **Rights Granted**: What rights are being transferred, licensed, or retained by each party
-7. **Compensation**: Any payment terms, advances, royalties, percentages, or financial arrangements
-8. **Duration**: Contract length, term, renewal provisions, or expiration dates
-9. **Termination**: How can the contract be ended? What are the exit clauses?
-10. **Risks & Concerns**: Potential red flags, unfavorable terms, or areas that might need negotiation
-11. **Important Dates**: Any deadlines, effective dates, or time-sensitive provisions
+IMPORTANT: Extract ACTUAL names, dates, amounts, and terms from the document - do not use placeholders like "Party A" unless the contract itself uses those terms.
 
-IMPORTANT: If you cannot find specific information, provide your best interpretation based on the document type. Do NOT leave fields empty.
+Your analysis MUST include specific details from the contract:
 
-Respond ONLY in this exact JSON format:
+1. **Contract Type**: Identify the exact type (Recording Agreement, Producer Contract, Management Agreement, NDA, etc.)
+
+2. **Parties**: List EVERY party with their ACTUAL names as written in the contract and their role:
+   - Look for signature blocks, "between" clauses, "hereinafter referred to as" phrases
+   - Extract company names, individual names, and their designated roles
+
+3. **Summary**: Write a clear 3-4 sentence summary explaining:
+   - What this contract is for
+   - Who the main parties are
+   - What the key exchange/deal is (what each party gives/gets)
+
+4. **Key Terms**: Extract specific numbers, percentages, and defined terms:
+   - Royalty rates (e.g., "15% of net receipts")
+   - Payment amounts (e.g., "$5,000 advance")
+   - Specific definitions from the contract
+
+5. **Obligations**: What SPECIFIC actions must each party take?
+
+6. **Rights Granted**: What specific rights are being transferred or licensed?
+
+7. **Compensation**: Extract ALL financial terms:
+   - Advances, royalties, fees, percentages
+   - Payment schedules and conditions
+
+8. **Duration**: Exact term length, start date, renewal options
+
+9. **Termination**: How can the contract end? What are the exit conditions?
+
+10. **Risks**: Identify concerning clauses, one-sided terms, or missing protections
+
+11. **Important Dates**: Any deadlines, effective dates, or milestones mentioned
+
+Respond ONLY in valid JSON format:
 {
-  "contract_type": "Type of contract",
+  "contract_type": "Specific type of contract",
   "parties": [
-    {"name": "Party name or description", "role": "Their role in the contract"}
+    {"name": "Actual name from contract", "role": "Their specific role"}
   ],
-  "summary": "Comprehensive 3-4 sentence summary of the contract",
-  "key_terms": ["term1: explanation", "term2: explanation"],
+  "summary": "3-4 sentence summary with actual details from the contract",
+  "key_terms": ["Specific term: exact definition/value from contract"],
   "obligations": [
-    {"party": "Party name", "obligation": "What they must do"}
+    {"party": "Party name", "obligation": "Specific obligation"}
   ],
-  "rights_granted": ["Right 1", "Right 2"],
+  "rights_granted": ["Specific right being granted"],
   "compensation": {
-    "description": "Overview of payment structure",
-    "details": ["Specific payment detail 1", "Detail 2"]
+    "description": "Overview of the deal structure",
+    "details": ["$X advance", "Y% royalty", etc.]
   },
-  "duration": "Contract term and renewal info",
-  "termination": ["Termination clause 1", "Clause 2"],
-  "risks": ["Risk or concern 1", "Risk 2"],
-  "dates": ["Important date 1", "Date 2"]
+  "duration": "Exact term with any renewal provisions",
+  "termination": ["Specific termination clause"],
+  "risks": ["Specific concern with explanation"],
+  "dates": ["Specific date and what it's for"]
 }`
 
     const { text: analysisText, model } = await generateWithFallback({
       systemPrompt,
-      userPrompt: `Analyze this contract document thoroughly. Extract all relevant information about parties, terms, obligations, and potential concerns:\n\n${extractedText.slice(0, 12000)}`,
-      maxOutputTokens: 3000,
+      userPrompt: `Analyze this contract and extract all specific details. Do not use generic placeholders - extract actual names, amounts, and terms:\n\n${extractedText.slice(0, 15000)}`,
+      maxOutputTokens: 4000,
       temperature: 0.2,
     })
 
@@ -246,15 +254,18 @@ Respond ONLY in this exact JSON format:
     }
 
     try {
+      // Find JSON in response
       const jsonMatch = analysisText.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
         analysis = JSON.parse(jsonMatch[0])
       }
     } catch (parseError) {
       console.error("Error parsing analysis:", parseError)
+      // Try to extract what we can from the response
+      analysis.summary = analysisText.slice(0, 500)
     }
 
-    // Save analysis results
+    // Save results
     await supabase
       .from("uploaded_files")
       .update({

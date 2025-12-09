@@ -10,13 +10,13 @@ export const stripe = new Stripe(
 
 export const PRODUCTS = {
   per_contract: {
-    id: "prod_TZPg2zCRCkcA0y",
+    id: "prod_TZS3MbcYBiHa4f",
     name: "Single Contract Generation",
     price: 999, // $9.99 in cents
     description: "Generate one AI-powered contract",
   },
   unlimited: {
-    id: "prod_TZPiXUxR0ktpcT",
+    id: "prod_TZS3I9e38MLwr1",
     name: "Unlimited Contracts",
     price: 1999, // $19.99 in cents
     description: "Unlimited contract generation per month",

@@ -1,17 +1,26 @@
 import { generateText } from "ai"
-import { createGoogleGenerativeAI } from "@ai-sdk/google"
-import { fetch } from "node-fetch" // Ensure fetch is available if not in browser environment
-import { ReadableStream, TextDecoder, TextEncoder } from "stream/web" // Ensure these are available if not in browser environment
+import { createOpenAI } from "@ai-sdk/openai"
 
-const GEMINI_API_KEY = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY || ""
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ""
 
-// Create Google provider with Gemini API key
-const google = createGoogleGenerativeAI({
-  apiKey: GEMINI_API_KEY,
+function validateOpenAIKey(key: string): void {
+  if (!key) {
+    throw new Error("OPENAI_API_KEY environment variable is required")
+  }
+  if (key.startsWith("AIzaSy")) {
+    throw new Error(
+      "OPENAI_API_KEY appears to be a Google/Gemini API key. Please set a valid OpenAI API key (starts with 'sk-').",
+    )
+  }
+}
+
+validateOpenAIKey(OPENAI_API_KEY)
+
+const openai = createOpenAI({
+  apiKey: OPENAI_API_KEY,
 })
 
-export type AIModel = "gemini" | "openai"
+export type AIModel = "openai" | "gemini"
 
 interface GenerateOptions {
   systemPrompt: string
@@ -24,135 +33,70 @@ export async function generateWithFallback(options: GenerateOptions): Promise<{
   text: string
   model: AIModel
 }> {
-  const { systemPrompt, userPrompt, maxOutputTokens = 2000, temperature = 0.7 } = options
+  const { systemPrompt, userPrompt, maxOutputTokens = 4000, temperature = 0.3 } = options
 
-  if (!GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY is required")
-  }
+  const models = ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"]
 
-  try {
-    const result = await generateText({
-      model: google("gemini-2.5-pro-preview-05-06"),
-      system: systemPrompt,
-      prompt: userPrompt,
-      maxTokens: maxOutputTokens,
-      temperature,
-    })
-    return { text: result.text, model: "gemini" }
-  } catch (error) {
-    console.error("[AI] Gemini Pro failed:", error)
+  let lastError: Error | null = null
 
-    // Try flash as fallback
+  for (const modelName of models) {
     try {
+      console.log(`[AI] Trying model: ${modelName}`)
       const result = await generateText({
-        model: google("gemini-2.0-flash"),
+        model: openai(modelName),
         system: systemPrompt,
         prompt: userPrompt,
         maxTokens: maxOutputTokens,
         temperature,
       })
-      return { text: result.text, model: "gemini" }
-    } catch (flashError) {
-      console.error("[AI] Gemini Flash also failed:", flashError)
-      throw new Error("AI generation failed: " + (error instanceof Error ? error.message : "Unknown error"))
+
+      if (result.text) {
+        console.log(`[AI] Success with model: ${modelName}`)
+        return { text: result.text, model: "openai" }
+      }
+    } catch (error) {
+      console.error(`[AI] ${modelName} failed:`, error instanceof Error ? error.message : error)
+      lastError = error instanceof Error ? error : new Error(String(error))
     }
   }
+
+  throw lastError || new Error("All OpenAI models failed. Please check your API key.")
 }
 
-// Direct Gemini call for chat - returns plain text stream
-export async function streamGeminiChat(options: {
+export async function generateChat(options: {
   systemPrompt: string
-  messages: Array<{ role: string; content: string }>
-  maxTokens?: number
-}): Promise<ReadableStream<Uint8Array>> {
-  const { systemPrompt, messages, maxTokens = 1500 } = options
+  messages: Array<{ role: "user" | "assistant"; content: string }>
+  maxOutputTokens?: number
+  temperature?: number
+}): Promise<string> {
+  const { systemPrompt, messages, maxOutputTokens = 2000, temperature = 0.7 } = options
 
-  if (!GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY is required")
-  }
-
-  // Build the full prompt from messages
-  const conversationHistory = messages
+  // Build conversation prompt
+  const conversationPrompt = messages
     .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
     .join("\n\n")
 
-  const fullPrompt = `${systemPrompt}\n\n${conversationHistory}`
-
-  // Use Gemini REST API directly for simpler streaming
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-preview-05-06:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [{ text: fullPrompt }],
-          },
-        ],
-        generationConfig: {
-          maxOutputTokens: maxTokens,
-          temperature: 0.7,
-        },
-      }),
-    },
-  )
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    console.error("[Gemini API Error]:", errorText)
-    throw new Error(`Gemini API error: ${response.status}`)
-  }
-
-  // Transform the SSE stream to plain text
-  const reader = response.body!.getReader()
-  const decoder = new TextDecoder()
-
-  return new ReadableStream({
-    async start(controller) {
-      const encoder = new TextEncoder()
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-
-          const chunk = decoder.decode(value)
-          const lines = chunk.split("\n")
-
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              const data = line.slice(6)
-              if (data === "[DONE]") continue
-
-              try {
-                const parsed = JSON.parse(data)
-                const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text
-                if (text) {
-                  controller.enqueue(encoder.encode(text))
-                }
-              } catch {
-                // Skip unparseable lines
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error("[Stream error]:", error)
-      } finally {
-        controller.close()
-      }
-    },
+  const result = await generateText({
+    model: openai("gpt-4o-mini"),
+    system: systemPrompt,
+    prompt: conversationPrompt + "\n\nAssistant:",
+    maxTokens: maxOutputTokens,
+    temperature,
   })
+
+  return result.text
 }
 
 export async function callOpenAI(endpoint: string, options: RequestInit): Promise<Response> {
+  const apiKey = OPENAI_API_KEY || process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY environment variable is required")
+  }
+
   const response = await fetch(`https://api.openai.com/v1${endpoint}`, {
     ...options,
     headers: {
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
       ...options.headers,
     },
@@ -165,13 +109,13 @@ export async function callGeminiDirect(options: {
   systemPrompt?: string
   maxTokens?: number
 }): Promise<string> {
-  const { prompt, systemPrompt, maxTokens = 4000 } = options
+  const { prompt, systemPrompt, maxTokens = 2000 } = options
 
-  const result = await generateWithFallback({
-    systemPrompt: systemPrompt || "",
-    userPrompt: prompt,
-    maxOutputTokens: maxTokens,
-    temperature: 0.7,
+  const result = await generateText({
+    model: openai("gpt-4o-mini"),
+    system: systemPrompt,
+    prompt,
+    maxTokens: maxTokens,
   })
 
   return result.text

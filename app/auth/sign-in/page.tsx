@@ -8,8 +8,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import Image from "next/image"
-import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useState, Suspense } from "react"
 import { FileText, Shield, Zap, PenTool, CheckCircle2 } from "lucide-react"
 
 const features = [
@@ -35,12 +35,16 @@ const features = [
   },
 ]
 
-export default function SignInPage() {
+function SignInForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  const redirectTo = searchParams.get("redirect")
+  const purchaseType = searchParams.get("purchase")
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -54,7 +58,15 @@ export default function SignInPage() {
         password,
       })
       if (error) throw error
-      router.push("/dashboard")
+
+      if (purchaseType && (purchaseType === "per_contract" || purchaseType === "unlimited")) {
+        // Redirect to pricing page which will auto-trigger checkout
+        router.push(`/pricing?purchase=${purchaseType}`)
+      } else if (redirectTo) {
+        router.push(redirectTo)
+      } else {
+        router.push("/dashboard")
+      }
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred")
     } finally {
@@ -62,6 +74,100 @@ export default function SignInPage() {
     }
   }
 
+  return (
+    <div className="w-full max-w-md">
+      {/* Mobile logo */}
+      <div className="flex flex-col items-center mb-8 lg:hidden">
+        <Link href="/" className="flex items-center gap-3 mb-4">
+          <Image
+            src="/images/artispreneur-20logo.png"
+            alt="Artispreneur Logo"
+            width={56}
+            height={56}
+            className="rounded-lg"
+          />
+        </Link>
+      </div>
+
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-foreground mb-2">Welcome back</h1>
+        <p className="text-muted-foreground">
+          {purchaseType ? "Sign in to complete your purchase" : "Sign in to continue managing your contracts"}
+        </p>
+      </div>
+
+      <form onSubmit={handleEmailLogin} className="space-y-5">
+        <div className="space-y-2">
+          <Label htmlFor="email" className="text-sm font-medium">
+            Email address
+          </Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="h-12 bg-input border-border text-base"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password" className="text-sm font-medium">
+              Password
+            </Label>
+            <Link href="/auth/forgot-password" className="text-sm text-primary hover:underline">
+              Forgot password?
+            </Link>
+          </div>
+          <Input
+            id="password"
+            type="password"
+            placeholder="Enter your password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="h-12 bg-input border-border text-base"
+          />
+        </div>
+
+        {error && (
+          <div className="text-sm text-destructive bg-destructive/10 p-4 rounded-lg border border-destructive/20">
+            {error}
+          </div>
+        )}
+
+        <Button type="submit" className="w-full h-12 text-base font-semibold" disabled={isLoading}>
+          {isLoading ? "Signing in..." : purchaseType ? "Sign in & Continue to Payment" : "Sign in"}
+        </Button>
+      </form>
+
+      <div className="mt-8 pt-6 border-t border-border">
+        <p className="text-center text-muted-foreground">
+          Don&apos;t have an account?{" "}
+          <Link
+            href={purchaseType ? `/auth/sign-up?redirect=/pricing&purchase=${purchaseType}` : "/auth/sign-up"}
+            className="text-primary hover:underline font-semibold"
+          >
+            Create one for free
+          </Link>
+        </p>
+      </div>
+
+      <p className="mt-8 text-center text-xs text-muted-foreground">
+        By signing in, you agree to our{" "}
+        <Link href="/terms" className="underline hover:text-foreground">
+          Terms of Service
+        </Link>{" "}
+        and{" "}
+        <Link href="/privacy" className="underline hover:text-foreground">
+          Privacy Policy
+        </Link>
+      </p>
+    </div>
+  )
+}
+
+export default function SignInPage() {
   return (
     <div className="min-h-screen bg-background flex">
       {/* Left side - Feature showcase */}
@@ -140,90 +246,9 @@ export default function SignInPage() {
 
       {/* Right side - Sign in form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-12">
-        <div className="w-full max-w-md">
-          {/* Mobile logo */}
-          <div className="flex flex-col items-center mb-8 lg:hidden">
-            <Link href="/" className="flex items-center gap-3 mb-4">
-              <Image
-                src="/images/artispreneur-20logo.png"
-                alt="Artispreneur Logo"
-                width={56}
-                height={56}
-                className="rounded-lg"
-              />
-            </Link>
-          </div>
-
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-foreground mb-2">Welcome back</h1>
-            <p className="text-muted-foreground">Sign in to continue managing your contracts</p>
-          </div>
-
-          <form onSubmit={handleEmailLogin} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium">
-                Email address
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="h-12 bg-input border-border text-base"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password" className="text-sm font-medium">
-                  Password
-                </Label>
-                <Link href="/auth/forgot-password" className="text-sm text-primary hover:underline">
-                  Forgot password?
-                </Link>
-              </div>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="h-12 bg-input border-border text-base"
-              />
-            </div>
-
-            {error && (
-              <div className="text-sm text-destructive bg-destructive/10 p-4 rounded-lg border border-destructive/20">
-                {error}
-              </div>
-            )}
-
-            <Button type="submit" className="w-full h-12 text-base font-semibold" disabled={isLoading}>
-              {isLoading ? "Signing in..." : "Sign in"}
-            </Button>
-          </form>
-
-          <div className="mt-8 pt-6 border-t border-border">
-            <p className="text-center text-muted-foreground">
-              Don&apos;t have an account?{" "}
-              <Link href="/auth/sign-up" className="text-primary hover:underline font-semibold">
-                Create one for free
-              </Link>
-            </p>
-          </div>
-
-          <p className="mt-8 text-center text-xs text-muted-foreground">
-            By signing in, you agree to our{" "}
-            <Link href="/terms" className="underline hover:text-foreground">
-              Terms of Service
-            </Link>{" "}
-            and{" "}
-            <Link href="/privacy" className="underline hover:text-foreground">
-              Privacy Policy
-            </Link>
-          </p>
-        </div>
+        <Suspense fallback={<div className="w-full max-w-md animate-pulse bg-muted h-96 rounded-lg" />}>
+          <SignInForm />
+        </Suspense>
       </div>
     </div>
   )

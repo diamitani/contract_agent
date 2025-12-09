@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { Header } from "@/components/header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Check, Sparkles, FileText, Zap, Crown, Loader2 } from "lucide-react"
 import { createBrowserClient } from "@supabase/ssr"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 
 const plans = [
   {
@@ -64,16 +64,20 @@ const plans = [
   },
 ]
 
-export default function PricingPage() {
+function PricingContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState<string | null>(null)
   const [user, setUser] = useState<any>(null)
   const [subscription, setSubscription] = useState<any>(null)
+  const [checkoutTriggered, setCheckoutTriggered] = useState(false)
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   )
+
+  const purchaseType = searchParams.get("purchase") as "per_contract" | "unlimited" | null
 
   useEffect(() => {
     const checkUser = async () => {
@@ -86,10 +90,15 @@ export default function PricingPage() {
         const res = await fetch("/api/check-subscription")
         const data = await res.json()
         setSubscription(data)
+
+        if (purchaseType && !checkoutTriggered) {
+          setCheckoutTriggered(true)
+          handlePurchase(purchaseType)
+        }
       }
     }
     checkUser()
-  }, [supabase.auth])
+  }, [supabase.auth, purchaseType, checkoutTriggered])
 
   const handlePurchase = async (productType: "per_contract" | "unlimited" | null) => {
     if (!productType) {
@@ -98,7 +107,7 @@ export default function PricingPage() {
     }
 
     if (!user) {
-      router.push("/auth/sign-in?redirect=/pricing")
+      router.push(`/auth/sign-in?redirect=/pricing&purchase=${productType}`)
       return
     }
 
@@ -127,117 +136,130 @@ export default function PricingPage() {
   }
 
   return (
+    <>
+      <div className="text-center mb-16">
+        <Badge className="mb-4 bg-primary/10 text-primary border-primary/20">
+          <Sparkles className="w-3 h-3 mr-1" />
+          Simple Pricing
+        </Badge>
+        <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4">Choose Your Plan</h1>
+        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+          Get professionally crafted music industry contracts. Start free with templates or upgrade for AI-powered
+          customization.
+        </p>
+
+        {subscription?.status === "unlimited" && (
+          <Badge className="mt-4 bg-green-500/10 text-green-500 border-green-500/20">
+            <Crown className="w-3 h-3 mr-1" />
+            You have Unlimited Access
+          </Badge>
+        )}
+
+        {subscription?.status === "per_contract" && subscription?.contractsRemaining > 0 && (
+          <Badge className="mt-4 bg-primary/10 text-primary border-primary/20">
+            <Zap className="w-3 h-3 mr-1" />
+            {subscription.contractsRemaining} Contract Credit{subscription.contractsRemaining > 1 ? "s" : ""} Remaining
+          </Badge>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        {plans.map((plan) => (
+          <Card
+            key={plan.name}
+            className={`relative bg-card border-border flex flex-col ${
+              plan.popular ? "border-primary shadow-lg shadow-primary/10 scale-105" : ""
+            }`}
+          >
+            {plan.popular && (
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                <Badge className="bg-primary text-primary-foreground">Most Popular</Badge>
+              </div>
+            )}
+
+            <CardHeader className="text-center pb-4">
+              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                {plan.name === "Free Templates" ? (
+                  <FileText className="w-6 h-6 text-primary" />
+                ) : plan.name === "Per Contract" ? (
+                  <Zap className="w-6 h-6 text-primary" />
+                ) : (
+                  <Crown className="w-6 h-6 text-primary" />
+                )}
+              </div>
+              <CardTitle className="text-xl text-foreground">{plan.name}</CardTitle>
+              <CardDescription className="text-muted-foreground">{plan.description}</CardDescription>
+            </CardHeader>
+
+            <CardContent className="flex-1">
+              <div className="text-center mb-6">
+                <span className="text-4xl font-bold text-foreground">{plan.price}</span>
+                {plan.period && <span className="text-muted-foreground ml-1">{plan.period}</span>}
+              </div>
+
+              <ul className="space-y-3">
+                {plan.features.map((feature) => (
+                  <li key={feature} className="flex items-start gap-3">
+                    <Check className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                    <span className="text-sm text-muted-foreground">{feature}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+
+            <CardFooter>
+              <Button
+                className={`w-full ${
+                  plan.popular
+                    ? "bg-primary hover:bg-primary/90 text-primary-foreground"
+                    : "bg-secondary hover:bg-secondary/80 text-secondary-foreground"
+                }`}
+                onClick={() => handlePurchase(plan.productType)}
+                disabled={plan.productType !== null && loading !== null}
+              >
+                {loading === plan.productType ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  plan.cta
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+        ))}
+      </div>
+
+      <div className="mt-16 text-center">
+        <p className="text-muted-foreground">
+          Questions? Email us at{" "}
+          <a href="mailto:pat@artispreneur.com" className="text-primary hover:underline">
+            pat@artispreneur.com
+          </a>
+        </p>
+      </div>
+    </>
+  )
+}
+
+export default function PricingPage() {
+  return (
     <div className="min-h-screen bg-background">
       <Header />
 
       <section className="py-16 md:py-24">
         <div className="container mx-auto px-4">
-          {/* Header */}
-          <div className="text-center mb-16">
-            <Badge className="mb-4 bg-primary/10 text-primary border-primary/20">
-              <Sparkles className="w-3 h-3 mr-1" />
-              Simple Pricing
-            </Badge>
-            <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4">Choose Your Plan</h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Get professionally crafted music industry contracts. Start free with templates or upgrade for AI-powered
-              customization.
-            </p>
-
-            {subscription?.status === "unlimited" && (
-              <Badge className="mt-4 bg-green-500/10 text-green-500 border-green-500/20">
-                <Crown className="w-3 h-3 mr-1" />
-                You have Unlimited Access
-              </Badge>
-            )}
-
-            {subscription?.status === "per_contract" && subscription?.contractsRemaining > 0 && (
-              <Badge className="mt-4 bg-primary/10 text-primary border-primary/20">
-                <Zap className="w-3 h-3 mr-1" />
-                {subscription.contractsRemaining} Contract Credit{subscription.contractsRemaining > 1 ? "s" : ""}{" "}
-                Remaining
-              </Badge>
-            )}
-          </div>
-
-          {/* Pricing Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {plans.map((plan) => (
-              <Card
-                key={plan.name}
-                className={`relative bg-card border-border flex flex-col ${
-                  plan.popular ? "border-primary shadow-lg shadow-primary/10 scale-105" : ""
-                }`}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                    <Badge className="bg-primary text-primary-foreground">Most Popular</Badge>
-                  </div>
-                )}
-
-                <CardHeader className="text-center pb-4">
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                    {plan.name === "Free Templates" ? (
-                      <FileText className="w-6 h-6 text-primary" />
-                    ) : plan.name === "Per Contract" ? (
-                      <Zap className="w-6 h-6 text-primary" />
-                    ) : (
-                      <Crown className="w-6 h-6 text-primary" />
-                    )}
-                  </div>
-                  <CardTitle className="text-xl text-foreground">{plan.name}</CardTitle>
-                  <CardDescription className="text-muted-foreground">{plan.description}</CardDescription>
-                </CardHeader>
-
-                <CardContent className="flex-1">
-                  <div className="text-center mb-6">
-                    <span className="text-4xl font-bold text-foreground">{plan.price}</span>
-                    {plan.period && <span className="text-muted-foreground ml-1">{plan.period}</span>}
-                  </div>
-
-                  <ul className="space-y-3">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-3">
-                        <Check className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                        <span className="text-sm text-muted-foreground">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-
-                <CardFooter>
-                  <Button
-                    className={`w-full ${
-                      plan.popular
-                        ? "bg-primary hover:bg-primary/90 text-primary-foreground"
-                        : "bg-secondary hover:bg-secondary/80 text-secondary-foreground"
-                    }`}
-                    onClick={() => handlePurchase(plan.productType)}
-                    disabled={loading !== null}
-                  >
-                    {loading === plan.productType ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      plan.cta
-                    )}
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
-
-          {/* FAQ or Additional Info */}
-          <div className="mt-16 text-center">
-            <p className="text-muted-foreground">
-              Questions? Email us at{" "}
-              <a href="mailto:pat@artispreneur.com" className="text-primary hover:underline">
-                pat@artispreneur.com
-              </a>
-            </p>
-          </div>
+          <Suspense
+            fallback={
+              <div className="text-center">
+                <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
+                <p className="mt-4 text-muted-foreground">Loading pricing...</p>
+              </div>
+            }
+          >
+            <PricingContent />
+          </Suspense>
         </div>
       </section>
     </div>

@@ -29,7 +29,6 @@ import {
   Clock,
   Shield,
   Sparkles,
-  ChevronRight,
 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
@@ -216,35 +215,36 @@ export default function FileViewerPage() {
       })
 
       if (response.ok) {
-        const reader = response.body?.getReader()
-        const decoder = new TextDecoder()
-        let assistantMessage = ""
+        const contentType = response.headers.get("content-type") || ""
 
-        setChatMessages((prev) => [...prev, { role: "assistant", content: "" }])
-
-        while (reader) {
-          const { done, value } = await reader.read()
-          if (done) break
-
-          const chunk = decoder.decode(value)
-          assistantMessage += chunk
-
-          setChatMessages((prev) => {
-            const newMessages = [...prev]
-            newMessages[newMessages.length - 1] = { role: "assistant", content: assistantMessage }
-            return newMessages
-          })
+        if (contentType.includes("application/json")) {
+          const error = await response.json()
+          setChatMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: `Error: ${error.error || "Failed to get response"}` },
+          ])
+        } else {
+          // Plain text response
+          const text = await response.text()
+          setChatMessages((prev) => [...prev, { role: "assistant", content: text }])
         }
       } else {
-        const error = await response.json()
-        setChatMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: `Error: ${error.error || "Failed to get response"}` },
-        ])
+        const errorText = await response.text()
+        let errorMessage = "Failed to get response"
+        try {
+          const errorJson = JSON.parse(errorText)
+          errorMessage = errorJson.error || errorMessage
+        } catch {
+          errorMessage = errorText || errorMessage
+        }
+        setChatMessages((prev) => [...prev, { role: "assistant", content: `Error: ${errorMessage}` }])
       }
     } catch (error) {
       console.error("Chat error:", error)
-      setChatMessages((prev) => [...prev, { role: "assistant", content: "Error: Failed to get response" }])
+      setChatMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: "Error: Failed to get response. Please try again." },
+      ])
     } finally {
       setChatLoading(false)
     }
@@ -265,18 +265,33 @@ export default function FileViewerPage() {
   const formatExtractedText = (text: string) => {
     if (!text) return null
 
+    // Check if the text is mostly gibberish
+    const readableChars = text.match(/[a-zA-Z]/g)?.length || 0
+    const totalChars = text.length
+    if (readableChars / totalChars < 0.3) {
+      return (
+        <div className="text-center py-8">
+          <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">Unable to extract readable text from this document.</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            The document may be scanned or in a format that requires OCR processing.
+          </p>
+        </div>
+      )
+    }
+
     // Split into paragraphs and format
     const paragraphs = text.split(/\n\n+/).filter((p) => p.trim())
 
     return paragraphs.map((paragraph, index) => {
       const trimmed = paragraph.trim()
 
-      // Check if it looks like a heading (short, possibly numbered, or all caps)
+      // Check if it looks like a heading
       const isHeading =
         trimmed.length < 100 &&
         (/^[0-9]+\.?\s/.test(trimmed) ||
           /^[A-Z][A-Z\s]+$/.test(trimmed) ||
-          /^(ARTICLE|SECTION|WHEREAS|NOW THEREFORE)/i.test(trimmed))
+          /^(ARTICLE|SECTION|WHEREAS|NOW THEREFORE|RECITALS|AGREEMENT|CONTRACT)/i.test(trimmed))
 
       if (isHeading) {
         return (
@@ -316,27 +331,35 @@ export default function FileViewerPage() {
 
   const analysis = file.analysis_result
 
+  const suggestedQuestions = [
+    "What are the main obligations for each party?",
+    "Are there any red flags I should be concerned about?",
+    "What happens if I want to terminate this contract?",
+    "Explain the compensation structure in simple terms",
+    "What rights am I giving up by signing this?",
+  ]
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="border-b bg-card">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" onClick={() => router.push("/dashboard")}>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-4 min-w-0 flex-1">
+              <Button variant="ghost" size="icon" onClick={() => router.push("/dashboard")} className="shrink-0">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="p-2 rounded-lg bg-primary/10 shrink-0">
                   <FileText className="w-6 h-6 text-primary" />
                 </div>
-                <div>
+                <div className="min-w-0 flex-1">
                   {isEditing ? (
                     <div className="flex items-center gap-2">
                       <Input
                         value={newName}
                         onChange={(e) => setNewName(e.target.value)}
-                        className="h-8 w-64"
+                        className="h-8 w-full max-w-xs"
                         autoFocus
                       />
                       <Button size="sm" onClick={handleRename}>
@@ -348,8 +371,9 @@ export default function FileViewerPage() {
                     </div>
                   ) : (
                     <h1
-                      className="font-semibold text-lg cursor-pointer hover:text-primary transition-colors"
+                      className="font-semibold text-lg cursor-pointer hover:text-primary transition-colors truncate max-w-md"
                       onClick={() => setIsEditing(true)}
+                      title={file.file_name}
                     >
                       {file.file_name}
                     </h1>
@@ -363,7 +387,7 @@ export default function FileViewerPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <Select value={file.folder_id || "none"} onValueChange={handleFolderChange}>
                 <SelectTrigger className="w-40">
                   <FolderOpen className="w-4 h-4 mr-2" />
@@ -422,65 +446,42 @@ export default function FileViewerPage() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Document Preview</CardTitle>
-                {!file.extracted_text && (
-                  <Button onClick={handleAnalyze} disabled={analyzing} size="sm">
-                    {analyzing ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Extracting...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4 mr-2" />
-                        Extract Text
-                      </>
-                    )}
-                  </Button>
-                )}
+                <Button onClick={handleAnalyze} disabled={analyzing} size="sm">
+                  {analyzing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      {file.extracted_text ? "Re-analyze" : "Analyze Document"}
+                    </>
+                  )}
+                </Button>
               </CardHeader>
               <CardContent>
                 {file.extracted_text ? (
-                  <ScrollArea className="h-[600px] border rounded-lg p-6 bg-muted/30">
+                  <ScrollArea className="h-[500px] border rounded-lg p-6 bg-muted/30">
                     <div className="prose prose-sm max-w-none dark:prose-invert">
                       {formatExtractedText(file.extracted_text)}
                     </div>
                   </ScrollArea>
-                ) : file.file_type.includes("pdf") ? (
-                  <div className="w-full h-[600px] border rounded-lg overflow-hidden">
-                    <iframe
-                      src={`${file.storage_path}#toolbar=1&navpanes=0`}
-                      className="w-full h-full"
-                      title="PDF Preview"
-                    />
-                  </div>
                 ) : (
                   <div className="h-[300px] border rounded-lg flex items-center justify-center bg-muted/30">
                     <div className="text-center">
                       <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
-                      <p className="text-muted-foreground mb-2">Preview not available</p>
+                      <p className="text-muted-foreground mb-2">Document not yet analyzed</p>
                       <p className="text-sm text-muted-foreground mb-4">
-                        Click "Extract Text" to analyze this document
+                        Click "Analyze Document" to extract text and get AI insights
                       </p>
-                      <Button onClick={handleAnalyze} disabled={analyzing}>
-                        {analyzing ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Extracting...
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="w-4 h-4 mr-2" />
-                            Extract Text
-                          </>
-                        )}
-                      </Button>
                     </div>
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* Contract Overview Card - Shows parties, duration, compensation */}
+            {/* Contract Overview Card */}
             {analysis && (
               <Card>
                 <CardHeader>
@@ -501,12 +502,16 @@ export default function FileViewerPage() {
                         <span className="font-medium">Parties Involved</span>
                       </div>
                       <div className="space-y-2">
-                        {analysis.parties?.map((party: any, i: number) => (
-                          <div key={i} className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">{party.role}</span>
-                            <span className="font-medium">{party.name}</span>
-                          </div>
-                        ))}
+                        {analysis.parties?.length > 0 ? (
+                          analysis.parties.map((party: any, i: number) => (
+                            <div key={i} className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">{party.role}</span>
+                              <span className="font-medium truncate ml-2">{party.name}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No parties identified</p>
+                        )}
                       </div>
                     </div>
 
@@ -528,6 +533,15 @@ export default function FileViewerPage() {
                       <p className="text-sm text-muted-foreground">
                         {analysis.compensation?.description || "Not specified"}
                       </p>
+                      {analysis.compensation?.details?.length > 0 && (
+                        <ul className="mt-2 space-y-1">
+                          {analysis.compensation.details.slice(0, 3).map((detail: string, i: number) => (
+                            <li key={i} className="text-xs text-muted-foreground">
+                              • {detail}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
 
                     {/* Important Dates */}
@@ -563,62 +577,35 @@ export default function FileViewerPage() {
                     <Brain className="w-5 h-5 text-primary" />
                     AI Analysis
                   </CardTitle>
-                  {file.analysis_status === "completed" ? (
-                    <Badge variant="secondary" className="bg-green-500/10 text-green-500">
+                  {file.analysis_status === "completed" && (
+                    <Badge className="bg-green-500/10 text-green-500">
                       <CheckCircle className="w-3 h-3 mr-1" />
                       Complete
                     </Badge>
-                  ) : (
-                    <Badge variant="secondary">Pending</Badge>
                   )}
                 </div>
               </CardHeader>
               <CardContent>
-                {!analysis ? (
-                  <div className="text-center py-8">
-                    <Brain className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground mb-4">
-                      Run AI analysis to get detailed insights about this contract
-                    </p>
-                    <Button onClick={handleAnalyze} disabled={analyzing}>
-                      {analyzing ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Analyzing...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-4 h-4 mr-2" />
-                          Analyze Contract
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                ) : (
+                {analysis ? (
                   <Tabs defaultValue="summary" className="w-full">
                     <TabsList className="grid w-full grid-cols-3">
                       <TabsTrigger value="summary">Summary</TabsTrigger>
-                      <TabsTrigger value="risks">Risks</TabsTrigger>
                       <TabsTrigger value="terms">Terms</TabsTrigger>
+                      <TabsTrigger value="risks">Risks</TabsTrigger>
                     </TabsList>
-
                     <TabsContent value="summary" className="mt-4">
                       <div className="space-y-4">
                         <div>
-                          <h4 className="font-medium mb-2">Contract Type</h4>
-                          <Badge variant="outline">{analysis.contract_type}</Badge>
-                        </div>
-                        <div>
-                          <h4 className="font-medium mb-2">Summary</h4>
+                          <h4 className="font-medium mb-2">Overview</h4>
                           <p className="text-sm text-muted-foreground">{analysis.summary}</p>
                         </div>
                         {analysis.rights_granted?.length > 0 && (
                           <div>
                             <h4 className="font-medium mb-2">Rights Granted</h4>
-                            <ul className="text-sm text-muted-foreground space-y-1">
-                              {analysis.rights_granted.map((right: string, i: number) => (
-                                <li key={i} className="flex items-start gap-2">
-                                  <ChevronRight className="w-4 h-4 mt-0.5 text-primary shrink-0" />
+                            <ul className="space-y-1">
+                              {analysis.rights_granted.slice(0, 5).map((right: string, i: number) => (
+                                <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
+                                  <CheckCircle className="w-3 h-3 text-green-500 mt-1 shrink-0" />
                                   {right}
                                 </li>
                               ))}
@@ -627,36 +614,54 @@ export default function FileViewerPage() {
                         )}
                       </div>
                     </TabsContent>
-
-                    <TabsContent value="risks" className="mt-4">
-                      <div className="space-y-3">
-                        {analysis.risks?.map((risk: string, i: number) => (
-                          <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-destructive/10">
-                            <AlertTriangle className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
-                            <p className="text-sm">{risk}</p>
-                          </div>
-                        ))}
-                        {(!analysis.risks || analysis.risks.length === 0) && (
-                          <p className="text-sm text-muted-foreground text-center py-4">
-                            No significant risks identified
-                          </p>
+                    <TabsContent value="terms" className="mt-4">
+                      <div className="space-y-2">
+                        {analysis.key_terms?.length > 0 ? (
+                          analysis.key_terms.map((term: string, i: number) => (
+                            <div key={i} className="p-2 rounded bg-muted/50">
+                              <p className="text-sm">{term}</p>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No key terms identified</p>
                         )}
                       </div>
                     </TabsContent>
-
-                    <TabsContent value="terms" className="mt-4">
-                      <div className="space-y-3">
-                        {analysis.key_terms?.map((term: string, i: number) => (
-                          <div key={i} className="p-3 rounded-lg bg-muted/50">
-                            <p className="text-sm">{term}</p>
-                          </div>
-                        ))}
-                        {(!analysis.key_terms || analysis.key_terms.length === 0) && (
-                          <p className="text-sm text-muted-foreground text-center py-4">No specific terms extracted</p>
+                    <TabsContent value="risks" className="mt-4">
+                      <div className="space-y-2">
+                        {analysis.risks?.length > 0 ? (
+                          analysis.risks.map((risk: string, i: number) => (
+                            <div key={i} className="flex items-start gap-2 p-2 rounded bg-destructive/10">
+                              <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                              <p className="text-sm">{risk}</p>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No significant risks identified</p>
                         )}
                       </div>
                     </TabsContent>
                   </Tabs>
+                ) : (
+                  <div className="text-center py-8">
+                    <Brain className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                    <p className="text-sm text-muted-foreground mb-3">
+                      AI analysis will appear here after you analyze the document
+                    </p>
+                    <Button onClick={handleAnalyze} disabled={analyzing} size="sm">
+                      {analyzing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          Start Analysis
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -677,17 +682,12 @@ export default function FileViewerPage() {
                     <div className="space-y-2">
                       <p className="text-xs text-muted-foreground">Suggested questions:</p>
                       <div className="flex flex-wrap gap-2">
-                        {[
-                          "What are my obligations?",
-                          "How can I terminate this?",
-                          "What are the payment terms?",
-                          "Are there any red flags?",
-                        ].map((q) => (
+                        {suggestedQuestions.slice(0, 3).map((q, i) => (
                           <Button
-                            key={q}
+                            key={i}
                             variant="outline"
                             size="sm"
-                            className="text-xs h-7 bg-transparent"
+                            className="text-xs h-auto py-1.5 px-2 bg-transparent"
                             onClick={() => handleSuggestedQuestion(q)}
                           >
                             {q}
@@ -698,24 +698,26 @@ export default function FileViewerPage() {
                   )}
 
                   {/* Chat Messages */}
-                  <ScrollArea className="h-[300px] pr-4">
-                    <div className="space-y-4">
-                      {chatMessages.map((msg, i) => (
-                        <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                          <div
-                            className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
-                              msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
-                            }`}
-                          >
-                            {msg.content}
-                          </div>
+                  <ScrollArea className="h-[300px] border rounded-lg p-3">
+                    <div className="space-y-3">
+                      {chatMessages.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground text-sm">
+                          Ask a question about this contract
                         </div>
-                      ))}
-                      {chatLoading && (
-                        <div className="flex justify-start">
-                          <div className="bg-muted rounded-lg px-3 py-2">
-                            <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        chatMessages.map((msg, i) => (
+                          <div
+                            key={i}
+                            className={`p-3 rounded-lg ${msg.role === "user" ? "bg-primary/10 ml-4" : "bg-muted mr-4"}`}
+                          >
+                            <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                           </div>
+                        ))
+                      )}
+                      {chatLoading && (
+                        <div className="flex items-center gap-2 p-3 bg-muted rounded-lg mr-4">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span className="text-sm">Thinking...</span>
                         </div>
                       )}
                       <div ref={chatEndRef} />
@@ -729,13 +731,20 @@ export default function FileViewerPage() {
                       onChange={(e) => setChatInput(e.target.value)}
                       placeholder="Ask about this contract..."
                       disabled={chatLoading || !file.extracted_text}
+                      className="flex-1"
                     />
-                    <Button type="submit" size="icon" disabled={chatLoading || !chatInput.trim()}>
+                    <Button
+                      type="submit"
+                      size="icon"
+                      disabled={chatLoading || !chatInput.trim() || !file.extracted_text}
+                    >
                       <Send className="w-4 h-4" />
                     </Button>
                   </form>
                   {!file.extracted_text && (
-                    <p className="text-xs text-muted-foreground text-center">Run analysis first to enable chat</p>
+                    <p className="text-xs text-muted-foreground text-center">
+                      Analyze the document first to enable chat
+                    </p>
                   )}
                 </div>
               </CardContent>

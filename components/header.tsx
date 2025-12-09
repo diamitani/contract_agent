@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { Sparkles, LayoutDashboard, Home, LogOut, User, FileText, CreditCard } from "lucide-react"
+import { Sparkles, LayoutDashboard, Home, LogOut, User, FileText, CreditCard, HelpCircle } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -83,6 +83,15 @@ export function Header() {
           >
             <FileText className="w-4 h-4" />
             Templates
+          </Link>
+          <Link
+            href="/how-it-works"
+            className={`text-sm flex items-center gap-2 transition-colors ${
+              pathname === "/how-it-works" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <HelpCircle className="w-4 h-4" />
+            How It Works
           </Link>
           <Link
             href="/pricing"

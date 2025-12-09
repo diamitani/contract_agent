@@ -47,7 +47,7 @@ export function UploadedFileCard({ file, onDelete }: UploadedFileCardProps) {
         </div>
         <div className="mt-3 w-full overflow-hidden">
           <CardTitle
-            className="text-lg text-foreground group-hover:text-primary transition-colors truncate block w-full max-w-full"
+            className="text-lg text-foreground group-hover:text-primary transition-colors truncate block max-w-full"
             title={file.file_name}
           >
             {file.file_name}

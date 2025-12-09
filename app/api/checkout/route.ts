@@ -14,9 +14,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { productType, contractSlug } = (await request.json()) as {
+    const { productType, contractSlug, couponCode } = (await request.json()) as {
       productType: ProductType
       contractSlug?: string
+      couponCode?: string
     }
 
     if (!productType || !PRODUCTS[productType]) {
@@ -63,6 +64,10 @@ export async function POST(request: NextRequest) {
       mode: productType === "unlimited" ? "subscription" : "payment",
       success_url: `${baseUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}${contractSlug ? `&contract=${contractSlug}` : ""}`,
       cancel_url: `${baseUrl}/pricing`,
+      allow_promotion_codes: true,
+      ...(couponCode && {
+        discounts: [{ coupon: couponCode }],
+      }),
       metadata: {
         user_id: user.id,
         product_type: productType,
@@ -95,7 +100,6 @@ export async function POST(request: NextRequest) {
       amount: product.price,
       product_type: productType,
       status: "pending",
-      app_id: APP_ID, // Track which app processed the payment
     })
 
     return NextResponse.json({ url: session.url })

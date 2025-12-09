@@ -9,8 +9,8 @@
     "start": "next start"
   },
   "dependencies": {
-    "@ai-sdk/google": "latest",
-    "@ai-sdk/openai": "2.0.80",
+    "@ai-sdk/google": "2.0.45",
+    "@ai-sdk/openai": "latest",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
@@ -55,7 +55,6 @@
     "lucide-react": "^0.454.0",
     "next": "16.0.7",
     "next-themes": "latest",
-    "node-fetch": "latest",
     "react": "19.2.0",
     "react-day-picker": "9.8.0",
     "react-dom": "19.2.0",
