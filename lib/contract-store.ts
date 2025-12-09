@@ -222,6 +222,10 @@ export async function getFolders(): Promise<Folder[]> {
     .order("name", { ascending: true })
 
   if (error) {
+    if (error.message?.includes("Could not find the table") || error.code === "42P01") {
+      console.warn("Folders table not yet created. Run scripts/006-file-management.sql")
+      return []
+    }
     console.error("Error fetching folders:", error)
     return []
   }
@@ -249,6 +253,10 @@ export async function createFolder(name: string, parentId?: string, color?: stri
     .single()
 
   if (error) {
+    if (error.message?.includes("Could not find the table") || error.code === "42P01") {
+      console.warn("Folders table not yet created. Run scripts/006-file-management.sql")
+      return null
+    }
     console.error("Error creating folder:", error)
     return null
   }
@@ -352,11 +360,15 @@ export async function trackEvent(eventType: string, eventData: Record<string, un
 
   if (!user) return
 
-  await supabase.from("analytics_events").insert({
-    user_id: user.id,
-    event_type: eventType,
-    event_data: eventData,
-  })
+  try {
+    await supabase.from("analytics_events").insert({
+      user_id: user.id,
+      event_type: eventType,
+      event_data: eventData,
+    })
+  } catch (err) {
+    console.warn("Analytics table not available:", err)
+  }
 }
 
 export async function getAnalytics(): Promise<{
@@ -382,7 +394,9 @@ export async function getAnalytics(): Promise<{
       .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .limit(10),
+      .limit(10)
+      .then((res) => res)
+      .catch(() => ({ data: [], error: null })),
   ])
 
   const contracts = contractsResult.data || []
