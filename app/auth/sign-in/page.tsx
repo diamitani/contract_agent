@@ -44,7 +44,8 @@ function SignInForm() {
   const searchParams = useSearchParams()
 
   const redirectTo = searchParams.get("redirect")
-  const purchaseType = searchParams.get("purchase")
+  const plan = searchParams.get("plan")
+  const contractSlug = searchParams.get("contract")
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -59,9 +60,8 @@ function SignInForm() {
       })
       if (error) throw error
 
-      if (purchaseType && (purchaseType === "per_contract" || purchaseType === "unlimited")) {
-        // Redirect to pricing page which will auto-trigger checkout
-        router.push(`/pricing?purchase=${purchaseType}`)
+      if (plan && (plan === "per_contract" || plan === "unlimited")) {
+        router.push(`/checkout/${plan}${contractSlug ? `?contract=${contractSlug}` : ""}`)
       } else if (redirectTo) {
         router.push(redirectTo)
       } else {
@@ -92,9 +92,18 @@ function SignInForm() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground mb-2">Welcome back</h1>
         <p className="text-muted-foreground">
-          {purchaseType ? "Sign in to complete your purchase" : "Sign in to continue managing your contracts"}
+          {plan ? "Sign in to complete your purchase" : "Sign in to continue managing your contracts"}
         </p>
       </div>
+
+      {plan && (
+        <div className="mb-6 p-4 rounded-lg bg-primary/10 border border-primary/20">
+          <p className="text-sm text-muted-foreground mb-1">Selected plan:</p>
+          <p className="font-semibold text-foreground">
+            {plan === "unlimited" ? "Unlimited Pro - $9.99/mo" : "Single Contract - $19.99"}
+          </p>
+        </div>
+      )}
 
       <form onSubmit={handleEmailLogin} className="space-y-5">
         <div className="space-y-2">
@@ -137,7 +146,7 @@ function SignInForm() {
         )}
 
         <Button type="submit" className="w-full h-12 text-base font-semibold" disabled={isLoading}>
-          {isLoading ? "Signing in..." : purchaseType ? "Sign in & Continue to Payment" : "Sign in"}
+          {isLoading ? "Signing in..." : plan ? "Sign in & Continue to Payment" : "Sign in"}
         </Button>
       </form>
 
@@ -145,7 +154,9 @@ function SignInForm() {
         <p className="text-center text-muted-foreground">
           Don&apos;t have an account?{" "}
           <Link
-            href={purchaseType ? `/auth/sign-up?redirect=/pricing&purchase=${purchaseType}` : "/auth/sign-up"}
+            href={
+              plan ? `/auth/sign-up?plan=${plan}${contractSlug ? `&contract=${contractSlug}` : ""}` : "/auth/sign-up"
+            }
             className="text-primary hover:underline font-semibold"
           >
             Create one for free

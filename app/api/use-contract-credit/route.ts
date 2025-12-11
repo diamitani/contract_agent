@@ -14,7 +14,7 @@ export async function POST() {
 
     const { data: profile } = await supabase
       .from("user_profiles")
-      .select("subscription_status, contracts_remaining, contracts_generated, last_free_contract_at")
+      .select("subscription_status, contracts_remaining, contracts_generated")
       .eq("user_id", user.id)
       .single()
 
@@ -32,15 +32,15 @@ export async function POST() {
         })
         .eq("user_id", user.id)
 
-      return NextResponse.json({ success: true, usedFreeContract: false })
+      return NextResponse.json({ success: true })
     }
 
     // Per-contract users need credits
-    if (profile.subscription_status === "per_contract" && profile.contracts_remaining > 0) {
+    if (profile.subscription_status === "per_contract" && (profile.contracts_remaining || 0) > 0) {
       await supabase
         .from("user_profiles")
         .update({
-          contracts_remaining: profile.contracts_remaining - 1,
+          contracts_remaining: (profile.contracts_remaining || 0) - 1,
           contracts_generated: (profile.contracts_generated || 0) + 1,
           updated_at: new Date().toISOString(),
         })
@@ -48,38 +48,11 @@ export async function POST() {
 
       return NextResponse.json({
         success: true,
-        contractsRemaining: profile.contracts_remaining - 1,
-        usedFreeContract: false,
+        contractsRemaining: (profile.contracts_remaining || 0) - 1,
       })
     }
 
-    const now = new Date()
-    const lastFreeContract = profile.last_free_contract_at ? new Date(profile.last_free_contract_at) : null
-
-    const isNewMonth =
-      !lastFreeContract ||
-      lastFreeContract.getMonth() !== now.getMonth() ||
-      lastFreeContract.getFullYear() !== now.getFullYear()
-
-    if (isNewMonth) {
-      // Use the free monthly contract
-      await supabase
-        .from("user_profiles")
-        .update({
-          contracts_generated: (profile.contracts_generated || 0) + 1,
-          last_free_contract_at: now.toISOString(),
-          updated_at: now.toISOString(),
-        })
-        .eq("user_id", user.id)
-
-      return NextResponse.json({
-        success: true,
-        usedFreeContract: true,
-        message: "Used your free monthly contract",
-      })
-    }
-
-    return NextResponse.json({ error: "No credits available" }, { status: 403 })
+    return NextResponse.json({ error: "No credits available. Please purchase a plan." }, { status: 403 })
   } catch (error) {
     console.error("Use credit error:", error)
     return NextResponse.json({ error: "Failed to use credit" }, { status: 500 })

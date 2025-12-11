@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { stripe, PRODUCTS, type ProductType, type Stripe } from "@/lib/stripe"
+import { stripe, PRODUCTS, type ProductType } from "@/lib/stripe"
 import { createClient } from "@/lib/supabase/server"
 import { APP_ID } from "@/lib/constants"
 
@@ -14,10 +14,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { productType, contractSlug, couponCode } = (await request.json()) as {
+    const { productType, contractSlug } = (await request.json()) as {
       productType: ProductType
       contractSlug?: string
-      couponCode?: string
     }
 
     if (!productType || !PRODUCTS[productType]) {
@@ -26,6 +25,7 @@ export async function POST(request: NextRequest) {
 
     const product = PRODUCTS[productType]
 
+    // Get or create Stripe customer
     const { data: profile } = await supabase
       .from("user_profiles")
       .select("stripe_customer_id")
@@ -35,7 +35,6 @@ export async function POST(request: NextRequest) {
     let customerId = profile?.stripe_customer_id
 
     if (!customerId) {
-      // Create Stripe customer
       const customer = await stripe.customers.create({
         email: user.email,
         metadata: {
@@ -45,7 +44,7 @@ export async function POST(request: NextRequest) {
       })
       customerId = customer.id
 
-      const { error: upsertError } = await supabase.from("user_profiles").upsert(
+      await supabase.from("user_profiles").upsert(
         {
           user_id: user.id,
           email: user.email,
@@ -53,26 +52,17 @@ export async function POST(request: NextRequest) {
         },
         { onConflict: "user_id" },
       )
-
-      if (upsertError) {
-        console.error("Failed to upsert user profile:", upsertError)
-        // Continue anyway - Stripe customer was created
-      }
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.headers.get("origin") || "http://localhost:3000"
 
-    // Create checkout session
-    const sessionConfig: Stripe.Checkout.SessionCreateParams = {
+    // Create embedded checkout session
+    const session = await stripe.checkout.sessions.create({
       customer: customerId,
       payment_method_types: ["card"],
       mode: productType === "unlimited" ? "subscription" : "payment",
-      success_url: `${baseUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}${contractSlug ? `&contract=${contractSlug}` : ""}`,
-      cancel_url: `${baseUrl}/pricing`,
-      allow_promotion_codes: true,
-      ...(couponCode && {
-        discounts: [{ coupon: couponCode }],
-      }),
+      ui_mode: "embedded",
+      return_url: `${baseUrl}/checkout/complete?session_id={CHECKOUT_SESSION_ID}${contractSlug ? `&contract=${contractSlug}` : ""}`,
       metadata: {
         user_id: user.id,
         product_type: productType,
@@ -94,10 +84,9 @@ export async function POST(request: NextRequest) {
           quantity: 1,
         },
       ],
-    }
+    })
 
-    const session = await stripe.checkout.sessions.create(sessionConfig)
-
+    // Record pending payment
     try {
       await supabase.from("payments").insert({
         user_id: user.id,
@@ -106,14 +95,13 @@ export async function POST(request: NextRequest) {
         product_type: productType,
         status: "pending",
       })
-    } catch (paymentError) {
-      console.error("Failed to record payment:", paymentError)
-      // Continue anyway - checkout session was created
+    } catch (e) {
+      console.error("Failed to record payment:", e)
     }
 
-    return NextResponse.json({ url: session.url })
+    return NextResponse.json({ clientSecret: session.client_secret })
   } catch (error) {
-    console.error("Checkout error:", error)
+    console.error("Checkout session error:", error)
     return NextResponse.json({ error: "Failed to create checkout session" }, { status: 500 })
   }
 }

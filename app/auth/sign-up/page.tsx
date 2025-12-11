@@ -8,8 +8,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import Image from "next/image"
-import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useState, Suspense } from "react"
 import { FileText, Shield, Zap, PenTool, CheckCircle2 } from "lucide-react"
 import { APP_ID } from "@/lib/constants"
 
@@ -36,13 +36,17 @@ const features = [
   },
 ]
 
-export default function SignUpPage() {
+function SignUpForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [fullName, setFullName] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  const plan = searchParams.get("plan")
+  const contractSlug = searchParams.get("contract")
 
   const handleEmailSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -51,7 +55,7 @@ export default function SignUpPage() {
     setError(null)
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -64,7 +68,21 @@ export default function SignUpPage() {
         },
       })
       if (error) throw error
-      router.push("/auth/sign-up-success")
+
+      if (plan && (plan === "per_contract" || plan === "unlimited")) {
+        // Check if email confirmation is required
+        if (data.user && !data.session) {
+          // Email confirmation required - show success page with info
+          router.push(`/auth/sign-up-success?plan=${plan}${contractSlug ? `&contract=${contractSlug}` : ""}`)
+        } else if (data.session) {
+          // Auto-confirmed - go directly to checkout
+          router.push(`/checkout/${plan}${contractSlug ? `?contract=${contractSlug}` : ""}`)
+        } else {
+          router.push("/auth/sign-up-success")
+        }
+      } else {
+        router.push("/auth/sign-up-success")
+      }
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred")
     } finally {
@@ -72,6 +90,125 @@ export default function SignUpPage() {
     }
   }
 
+  return (
+    <div className="w-full max-w-md">
+      {/* Mobile logo */}
+      <div className="flex flex-col items-center mb-8 lg:hidden">
+        <Link href="/" className="flex items-center gap-3 mb-4">
+          <Image
+            src="/images/artispreneur-20logo.png"
+            alt="Artispreneur Logo"
+            width={56}
+            height={56}
+            className="rounded-lg"
+          />
+        </Link>
+      </div>
+
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-foreground mb-2">Create your account</h1>
+        <p className="text-muted-foreground">
+          {plan === "unlimited"
+            ? "Sign up to start your Unlimited Pro subscription"
+            : plan === "per_contract"
+              ? "Sign up to purchase your contract"
+              : "Get started with Artispreneur"}
+        </p>
+      </div>
+
+      {plan && (
+        <div className="mb-6 p-4 rounded-lg bg-primary/10 border border-primary/20">
+          <p className="text-sm text-muted-foreground mb-1">Selected plan:</p>
+          <p className="font-semibold text-foreground">
+            {plan === "unlimited" ? "Unlimited Pro - $9.99/mo" : "Single Contract - $19.99"}
+          </p>
+        </div>
+      )}
+
+      <form onSubmit={handleEmailSignUp} className="space-y-5">
+        <div className="space-y-2">
+          <Label htmlFor="fullName" className="text-sm font-medium">
+            Full name
+          </Label>
+          <Input
+            id="fullName"
+            type="text"
+            placeholder="John Doe"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            className="h-12 bg-input border-border text-base"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="email" className="text-sm font-medium">
+            Email address
+          </Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="h-12 bg-input border-border text-base"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="password" className="text-sm font-medium">
+            Password
+          </Label>
+          <Input
+            id="password"
+            type="password"
+            placeholder="Min. 6 characters"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="h-12 bg-input border-border text-base"
+          />
+          <p className="text-xs text-muted-foreground">Must be at least 6 characters long</p>
+        </div>
+
+        {error && (
+          <div className="text-sm text-destructive bg-destructive/10 p-4 rounded-lg border border-destructive/20">
+            {error}
+          </div>
+        )}
+
+        <Button type="submit" className="w-full h-12 text-base font-semibold" disabled={isLoading}>
+          {isLoading ? "Creating account..." : plan ? "Create Account & Continue" : "Create account"}
+        </Button>
+      </form>
+
+      <div className="mt-8 pt-6 border-t border-border">
+        <p className="text-center text-muted-foreground">
+          Already have an account?{" "}
+          <Link
+            href={
+              plan ? `/auth/sign-in?plan=${plan}${contractSlug ? `&contract=${contractSlug}` : ""}` : "/auth/sign-in"
+            }
+            className="text-primary hover:underline font-semibold"
+          >
+            Sign in
+          </Link>
+        </p>
+      </div>
+
+      <p className="mt-8 text-center text-xs text-muted-foreground">
+        By creating an account, you agree to our{" "}
+        <Link href="/terms" className="underline hover:text-foreground">
+          Terms of Service
+        </Link>{" "}
+        and{" "}
+        <Link href="/privacy" className="underline hover:text-foreground">
+          Privacy Policy
+        </Link>
+      </p>
+    </div>
+  )
+}
+
+export default function SignUpPage() {
   return (
     <div className="min-h-screen bg-background flex">
       {/* Left side - Feature showcase */}
@@ -151,100 +288,9 @@ export default function SignUpPage() {
 
       {/* Right side - Sign up form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-12">
-        <div className="w-full max-w-md">
-          {/* Mobile logo */}
-          <div className="flex flex-col items-center mb-8 lg:hidden">
-            <Link href="/" className="flex items-center gap-3 mb-4">
-              <Image
-                src="/images/artispreneur-20logo.png"
-                alt="Artispreneur Logo"
-                width={56}
-                height={56}
-                className="rounded-lg"
-              />
-            </Link>
-          </div>
-
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-foreground mb-2">Create your account</h1>
-            <p className="text-muted-foreground">Get started with Artispreneur for free</p>
-          </div>
-
-          <form onSubmit={handleEmailSignUp} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="fullName" className="text-sm font-medium">
-                Full name
-              </Label>
-              <Input
-                id="fullName"
-                type="text"
-                placeholder="John Doe"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="h-12 bg-input border-border text-base"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium">
-                Email address
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="h-12 bg-input border-border text-base"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium">
-                Password
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Min. 6 characters"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="h-12 bg-input border-border text-base"
-              />
-              <p className="text-xs text-muted-foreground">Must be at least 6 characters long</p>
-            </div>
-
-            {error && (
-              <div className="text-sm text-destructive bg-destructive/10 p-4 rounded-lg border border-destructive/20">
-                {error}
-              </div>
-            )}
-
-            <Button type="submit" className="w-full h-12 text-base font-semibold" disabled={isLoading}>
-              {isLoading ? "Creating account..." : "Create account"}
-            </Button>
-          </form>
-
-          <div className="mt-8 pt-6 border-t border-border">
-            <p className="text-center text-muted-foreground">
-              Already have an account?{" "}
-              <Link href="/auth/sign-in" className="text-primary hover:underline font-semibold">
-                Sign in
-              </Link>
-            </p>
-          </div>
-
-          <p className="mt-8 text-center text-xs text-muted-foreground">
-            By creating an account, you agree to our{" "}
-            <Link href="/terms" className="underline hover:text-foreground">
-              Terms of Service
-            </Link>{" "}
-            and{" "}
-            <Link href="/privacy" className="underline hover:text-foreground">
-              Privacy Policy
-            </Link>
-          </p>
-        </div>
+        <Suspense fallback={<div className="w-full max-w-md animate-pulse bg-muted h-96 rounded-lg" />}>
+          <SignUpForm />
+        </Suspense>
       </div>
     </div>
   )

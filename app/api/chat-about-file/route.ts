@@ -16,6 +16,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { data: profile } = await supabase
+      .from("user_profiles")
+      .select("subscription_status")
+      .eq("user_id", user.id)
+      .maybeSingle()
+
+    if (profile?.subscription_status !== "active") {
+      return NextResponse.json(
+        {
+          error: "Contract chat assistant requires an Unlimited Contracts subscription",
+          requiresSubscription: true,
+        },
+        { status: 403 },
+      )
+    }
+
     const analysisContext = analysis
       ? `
 CONTRACT ANALYSIS SUMMARY:

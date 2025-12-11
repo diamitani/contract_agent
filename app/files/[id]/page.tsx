@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { createBrowserClient } from "@/lib/supabase/client"
@@ -28,11 +27,12 @@ import {
   DollarSign,
   Clock,
   Shield,
-  Sparkles,
   Expand,
   ZoomIn,
   ZoomOut,
   X,
+  Lock,
+  Crown,
 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
@@ -47,6 +47,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import Link from "next/link"
 
 interface UploadedFile {
   id: string
@@ -91,83 +92,116 @@ export default function FileViewerPage() {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(true)
   const [pdfError, setPdfError] = useState(false)
-
-  const supabase = createBrowserClient()
+  const [hasSubscription, setHasSubscription] = useState(false)
+  const [checkingSubscription, setCheckingSubscription] = useState(true)
 
   useEffect(() => {
-    fetchFile()
-    fetchFolders()
-  }, [fileId])
+    const fetchData = async () => {
+      const supabase = createBrowserClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        router.push("/auth/sign-in")
+        return
+      }
+
+      const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("subscription_status")
+        .eq("user_id", user.id)
+        .maybeSingle()
+
+      setHasSubscription(profile?.subscription_status === "active")
+      setCheckingSubscription(false)
+
+      const { data: fileData, error: fileError } = await supabase
+        .from("uploaded_files")
+        .select("*")
+        .eq("id", fileId)
+        .eq("user_id", user.id)
+        .single()
+
+      if (fileError || !fileData) {
+        router.push("/dashboard")
+        return
+      }
+
+      setFile(fileData)
+      setNewName(fileData.file_name)
+
+      const { data: foldersData } = await supabase
+        .from("folders")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("name", { ascending: true })
+
+      setFolders(foldersData || [])
+      setLoading(false)
+    }
+
+    fetchData()
+  }, [fileId, router])
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [chatMessages])
 
-  const fetchFile = async () => {
-    try {
-      const { data, error } = await supabase.from("uploaded_files").select("*").eq("id", fileId).single()
-
-      if (error) throw error
-      setFile(data)
-      setNewName(data.file_name)
-    } catch (error) {
-      console.error("Error fetching file:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchFolders = async () => {
-    try {
-      const { data } = await supabase.from("folders").select("*").order("name")
-      setFolders(data || [])
-    } catch (error) {
-      console.error("Error fetching folders:", error)
-    }
-  }
-
   const handleRename = async () => {
     if (!file || !newName.trim()) return
+    const supabase = createBrowserClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
 
-    try {
-      await supabase.from("uploaded_files").update({ file_name: newName.trim() }).eq("id", file.id)
+    const { error } = await supabase
+      .from("uploaded_files")
+      .update({ file_name: newName.trim() })
+      .eq("id", file.id)
+      .eq("user_id", user.id)
 
-      setFile({ ...file, file_name: newName.trim() })
+    if (!error) {
+      setFile((prev) => (prev ? { ...prev, file_name: newName.trim() } : null))
       setIsEditing(false)
-    } catch (error) {
-      console.error("Error renaming file:", error)
     }
   }
 
   const handleFolderChange = async (folderId: string) => {
     if (!file) return
+    const supabase = createBrowserClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
 
-    try {
-      await supabase
-        .from("uploaded_files")
-        .update({ folder_id: folderId === "none" ? null : folderId })
-        .eq("id", file.id)
+    const newFolderId = folderId === "none" ? null : folderId
+    const { error } = await supabase
+      .from("uploaded_files")
+      .update({ folder_id: newFolderId })
+      .eq("id", file.id)
+      .eq("user_id", user.id)
 
-      setFile({ ...file, folder_id: folderId === "none" ? null : folderId })
-    } catch (error) {
-      console.error("Error updating folder:", error)
+    if (!error) {
+      setFile((prev) => (prev ? { ...prev, folder_id: newFolderId } : null))
     }
   }
 
   const handleDelete = async () => {
     if (!file) return
+    const supabase = createBrowserClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
 
-    try {
-      await supabase.from("uploaded_files").delete().eq("id", file.id)
-      router.push("/dashboard")
-    } catch (error) {
-      console.error("Error deleting file:", error)
-    }
+    const { error } = await supabase.from("uploaded_files").delete().eq("id", file.id).eq("user_id", user.id)
+    if (!error) router.push("/dashboard")
   }
 
   const handleAnalyze = async () => {
-    if (!file) return
-
+    if (!file || !hasSubscription) return
     setAnalyzing(true)
 
     try {
@@ -185,16 +219,15 @@ export default function FileViewerPage() {
                 ...prev,
                 analysis_status: "completed",
                 analysis_result: result.analysis,
-                extracted_text: result.extractedText,
               }
             : null,
         )
       } else {
         const error = await response.json()
+        if (error.requiresSubscription) setHasSubscription(false)
         alert("Analysis failed: " + (error.error || "Unknown error"))
       }
     } catch (error) {
-      console.error("Analysis error:", error)
       alert("Analysis failed. Please try again.")
     } finally {
       setAnalyzing(false)
@@ -203,9 +236,9 @@ export default function FileViewerPage() {
 
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!chatInput.trim() || !file) return
+    if (!chatInput.trim() || !file || !hasSubscription) return
 
-    const userMessage = chatInput
+    const userMessage = chatInput.trim()
     setChatInput("")
     setChatMessages((prev) => [...prev, { role: "user", content: userMessage }])
     setChatLoading(true)
@@ -217,50 +250,132 @@ export default function FileViewerPage() {
         body: JSON.stringify({
           fileId: file.id,
           message: userMessage,
-          context: file.extracted_text || "",
+          context: file.extracted_text,
           history: chatMessages,
           analysis: file.analysis_result,
         }),
       })
 
-      const data = await response.json()
-
-      if (response.ok && data.response) {
+      if (response.ok) {
+        const data = await response.json()
         setChatMessages((prev) => [...prev, { role: "assistant", content: data.response }])
       } else {
-        setChatMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: `Error: ${data.error || "Failed to get response"}` },
-        ])
+        const error = await response.json()
+        if (error.requiresSubscription) setHasSubscription(false)
+        setChatMessages((prev) => [...prev, { role: "assistant", content: `Error: ${error.error || "Failed"}` }])
       }
     } catch (error) {
-      console.error("Chat error:", error)
-      setChatMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "Error: Failed to get response. Please try again." },
-      ])
+      setChatMessages((prev) => [...prev, { role: "assistant", content: "Sorry, an error occurred." }])
     } finally {
       setChatLoading(false)
     }
   }
 
-  const handleSuggestedQuestion = (question: string) => {
-    setChatInput(question)
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + " B"
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB"
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB"
   }
 
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes"
-    const k = 1024
-    const sizes = ["Bytes", "KB", "MB", "GB"]
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
-  }
+  const SubscriptionPaywall = ({ feature }: { feature: string }) => (
+    <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+      <CardContent className="pt-6">
+        <div className="flex flex-col items-center text-center gap-4">
+          <div className="p-3 rounded-full bg-primary/10">
+            <Crown className="w-8 h-8 text-primary" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold mb-2">Unlock {feature}</h3>
+            <p className="text-muted-foreground text-sm mb-4">
+              Get AI-powered contract analysis, document chat, and unlimited contract generation with the Unlimited
+              plan.
+            </p>
+          </div>
+          <Button asChild>
+            <Link href="/pricing">
+              <Lock className="w-4 h-4 mr-2" />
+              Upgrade Now
+            </Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
 
-  const isPdf = file?.file_type === "application/pdf" || file?.file_name?.toLowerCase().endsWith(".pdf")
-
-  const getPdfViewerUrl = (url: string) => {
-    // Use Google Docs viewer for better compatibility
+  const getGoogleViewerUrl = (url: string) => {
     return `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`
+  }
+
+  const renderPdfViewer = () => {
+    if (!file) return null
+
+    const isPdf = file.file_type === "application/pdf" || file.file_name.toLowerCase().endsWith(".pdf")
+    const isImage = file.file_type.startsWith("image/")
+
+    if (isImage) {
+      return (
+        <div className="h-[600px] flex items-center justify-center bg-muted/30 rounded-lg overflow-hidden">
+          <img
+            src={file.storage_path || "/placeholder.svg"}
+            alt={file.file_name}
+            className="max-w-full max-h-full object-contain"
+            style={{ transform: `scale(${pdfScale / 100})` }}
+          />
+        </div>
+      )
+    }
+
+    return (
+      <div className="h-[600px] border rounded-lg overflow-hidden relative bg-muted/30">
+        <div className="absolute top-2 right-2 z-10 flex items-center gap-2 bg-background/80 backdrop-blur rounded-lg p-1">
+          <Button variant="ghost" size="icon" onClick={() => setPdfScale(Math.max(50, pdfScale - 10))}>
+            <ZoomOut className="w-4 h-4" />
+          </Button>
+          <span className="text-xs w-12 text-center">{pdfScale}%</span>
+          <Button variant="ghost" size="icon" onClick={() => setPdfScale(Math.min(200, pdfScale + 10))}>
+            <ZoomIn className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => setIsFullscreen(true)}>
+            <Expand className="w-4 h-4" />
+          </Button>
+        </div>
+
+        {pdfLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        )}
+
+        {pdfError ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+            <FileText className="w-16 h-16 text-muted-foreground" />
+            <p className="text-muted-foreground">Unable to preview document</p>
+            <Button asChild variant="outline">
+              <a href={file.storage_path} target="_blank" rel="noopener noreferrer">
+                <Download className="w-4 h-4 mr-2" />
+                Download to View
+              </a>
+            </Button>
+          </div>
+        ) : (
+          <iframe
+            src={
+              isPdf
+                ? getGoogleViewerUrl(file.storage_path)
+                : `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(file.storage_path)}`
+            }
+            className="w-full h-full border-0"
+            style={{ transform: `scale(${pdfScale / 100})`, transformOrigin: "top left" }}
+            onLoad={() => setPdfLoading(false)}
+            onError={() => {
+              setPdfLoading(false)
+              setPdfError(true)
+            }}
+            title={file.file_name}
+          />
+        )}
+      </div>
+    )
   }
 
   if (loading) {
@@ -274,470 +389,145 @@ export default function FileViewerPage() {
   if (!file) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h2 className="text-xl font-semibold mb-2">File not found</h2>
-          <Button onClick={() => router.push("/dashboard")}>Back to Dashboard</Button>
-        </div>
+        <p>File not found</p>
       </div>
     )
   }
 
-  const analysis = file.analysis_result
-
-  const suggestedQuestions = [
-    "What are the main obligations for each party?",
-    "Are there any red flags I should be concerned about?",
-    "What happens if I want to terminate this contract?",
-    "Explain the compensation structure in simple terms",
-    "What rights am I giving up by signing this?",
-  ]
-
-  const PdfViewer = ({ fullscreen = false }: { fullscreen?: boolean }) => (
-    <div className={`relative ${fullscreen ? "h-[80vh]" : "h-[500px]"} bg-muted/30 rounded-lg overflow-hidden`}>
-      {/* PDF Controls */}
-      <div className="absolute top-2 right-2 z-10 flex items-center gap-1 bg-background/90 backdrop-blur rounded-lg p-1 shadow-lg">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          onClick={() => setPdfScale((s) => Math.max(50, s - 25))}
-          title="Zoom out"
-        >
-          <ZoomOut className="w-4 h-4" />
-        </Button>
-        <span className="text-xs font-medium px-2 min-w-[3rem] text-center">{pdfScale}%</span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          onClick={() => setPdfScale((s) => Math.min(200, s + 25))}
-          title="Zoom in"
-        >
-          <ZoomIn className="w-4 h-4" />
-        </Button>
-        {!fullscreen && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => setIsFullscreen(true)}
-            title="Fullscreen"
-          >
-            <Expand className="w-4 h-4" />
-          </Button>
-        )}
-      </div>
-
-      {/* Loading state */}
-      {pdfLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-muted/50 z-5">
-          <div className="text-center">
-            <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">Loading document...</p>
-          </div>
-        </div>
-      )}
-
-      {/* Error state */}
-      {pdfError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-muted/50 z-5">
-          <div className="text-center">
-            <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
-            <p className="text-muted-foreground mb-4">Unable to preview this document</p>
-            <Button asChild>
-              <a href={file.storage_path} download={file.file_name}>
-                <Download className="w-4 h-4 mr-2" />
-                Download Instead
-              </a>
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* PDF iframe */}
-      <iframe
-        src={getPdfViewerUrl(file.storage_path)}
-        className="w-full h-full border-0"
-        style={{
-          transform: `scale(${pdfScale / 100})`,
-          transformOrigin: "top left",
-          width: `${10000 / pdfScale}%`,
-          height: `${10000 / pdfScale}%`,
-        }}
-        onLoad={() => {
-          setPdfLoading(false)
-          setPdfError(false)
-        }}
-        onError={() => {
-          setPdfLoading(false)
-          setPdfError(true)
-        }}
-        title={file.file_name}
-      />
-    </div>
-  )
-
-  const FilePreview = () => {
-    const isImage = file.file_type?.startsWith("image/")
-
-    if (isImage) {
-      return (
-        <div className="h-[500px] flex items-center justify-center bg-muted/30 rounded-lg overflow-hidden">
-          <img
-            src={file.storage_path || "/placeholder.svg"}
-            alt={file.file_name}
-            className="max-w-full max-h-full object-contain"
-          />
-        </div>
-      )
-    }
-
-    // For DOCX and other files, show download prompt
-    return (
-      <div className="h-[300px] border rounded-lg flex items-center justify-center bg-muted/30">
-        <div className="text-center">
-          <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
-          <p className="text-muted-foreground mb-2">Preview not available for this file type</p>
-          <p className="text-sm text-muted-foreground mb-4">
-            Click "Analyze Document" to extract text, or download the file to view it
-          </p>
-          <div className="flex items-center justify-center gap-2">
-            <Button asChild variant="outline">
-              <a href={file.storage_path} download={file.file_name}>
-                <Download className="w-4 h-4 mr-2" />
-                Download
-              </a>
-            </Button>
-            <Button onClick={handleAnalyze} disabled={analyzing}>
-              {analyzing ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Analyzing...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  Analyze
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  const analysisResult = file.analysis_result
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Fullscreen Dialog */}
       <Dialog open={isFullscreen} onOpenChange={setIsFullscreen}>
-        <DialogContent className="max-w-[95vw] w-full h-[90vh] p-0">
-          <DialogHeader className="p-4 pb-0 flex flex-row items-center justify-between">
-            <DialogTitle className="truncate pr-8">{file.file_name}</DialogTitle>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute right-4 top-4"
-              onClick={() => setIsFullscreen(false)}
-            >
-              <X className="w-4 h-4" />
-            </Button>
+        <DialogContent className="max-w-[95vw] w-full h-[95vh] p-0">
+          <DialogHeader className="p-4 border-b">
+            <div className="flex items-center justify-between">
+              <DialogTitle>{file.file_name}</DialogTitle>
+              <Button variant="ghost" size="icon" onClick={() => setIsFullscreen(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
           </DialogHeader>
-          <div className="p-4 pt-2 h-full">
-            <PdfViewer fullscreen />
+          <div className="flex-1 h-[calc(95vh-60px)]">
+            <iframe
+              src={
+                file.file_name.toLowerCase().endsWith(".pdf")
+                  ? getGoogleViewerUrl(file.storage_path)
+                  : `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(file.storage_path)}`
+              }
+              className="w-full h-full border-0"
+              title={file.file_name}
+            />
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Header */}
-      <div className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-4 min-w-0 flex-1">
-              <Button variant="ghost" size="icon" onClick={() => router.push("/dashboard")} className="shrink-0">
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="p-2 rounded-lg bg-primary/10 shrink-0">
-                  <FileText className="w-6 h-6 text-primary" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  {isEditing ? (
-                    <div className="flex items-center gap-2">
-                      <Input
-                        value={newName}
-                        onChange={(e) => setNewName(e.target.value)}
-                        className="h-8 w-full max-w-xs"
-                        autoFocus
-                      />
-                      <Button size="sm" onClick={handleRename}>
-                        Save
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)}>
-                        Cancel
-                      </Button>
-                    </div>
-                  ) : (
-                    <h1
-                      className="font-semibold text-lg cursor-pointer hover:text-primary transition-colors truncate max-w-md"
-                      onClick={() => setIsEditing(true)}
-                      title={file.file_name}
-                    >
-                      {file.file_name}
-                    </h1>
-                  )}
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>{formatBytes(file.file_size)}</span>
-                    <span>•</span>
-                    <span>{new Date(file.created_at).toLocaleDateString()}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              <Select value={file.folder_id || "none"} onValueChange={handleFolderChange}>
-                <SelectTrigger className="w-40">
-                  <FolderOpen className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="No folder" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No folder</SelectItem>
-                  {folders.map((folder) => (
-                    <SelectItem key={folder.id} value={folder.id}>
-                      <div className="flex items-center gap-2">
-                        <div className={`w-3 h-3 rounded-full ${folder.color}`} />
-                        {folder.name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Button variant="outline" size="icon" asChild>
-                <a href={file.storage_path} download={file.file_name}>
-                  <Download className="w-4 h-4" />
-                </a>
-              </Button>
-
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="outline" size="icon" className="text-destructive bg-transparent">
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete file?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This action cannot be undone. This will permanently delete the file.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
-                      Delete
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Document Preview */}
-          <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Document Preview</CardTitle>
-                <Button onClick={handleAnalyze} disabled={analyzing} size="sm">
-                  {analyzing ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Analyzing...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4 mr-2" />
-                      {file.analysis_result ? "Re-analyze" : "Analyze Document"}
-                    </>
-                  )}
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-6">
+          <Button variant="ghost" size="icon" onClick={() => router.push("/dashboard")}>
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div className="flex-1 min-w-0">
+            {isEditing ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  className="max-w-md"
+                  onKeyDown={(e) => e.key === "Enter" && handleRename()}
+                />
+                <Button size="sm" onClick={handleRename}>
+                  Save
                 </Button>
-              </CardHeader>
-              <CardContent>{isPdf ? <PdfViewer /> : <FilePreview />}</CardContent>
-            </Card>
-
-            {/* Contract Overview Card */}
-            {analysis && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="w-5 h-5 text-primary" />
-                    Contract Overview
-                  </CardTitle>
-                  <CardDescription>
-                    {analysis.contract_type || "Contract"} • {analysis.parties?.length || 0} parties involved
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Parties */}
-                    <div className="p-4 rounded-lg bg-muted/50">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Users className="w-4 h-4 text-primary" />
-                        <span className="font-medium">Parties Involved</span>
-                      </div>
-                      <div className="space-y-2">
-                        {analysis.parties?.length > 0 ? (
-                          analysis.parties.map((party: any, i: number) => (
-                            <div key={i} className="flex items-center justify-between text-sm">
-                              <span className="text-muted-foreground">{party.role}</span>
-                              <span className="font-medium truncate ml-2">{party.name}</span>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-sm text-muted-foreground">No parties identified</p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Duration */}
-                    <div className="p-4 rounded-lg bg-muted/50">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Clock className="w-4 h-4 text-primary" />
-                        <span className="font-medium">Duration</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{analysis.duration || "Not specified"}</p>
-                    </div>
-
-                    {/* Compensation */}
-                    <div className="p-4 rounded-lg bg-muted/50">
-                      <div className="flex items-center gap-2 mb-3">
-                        <DollarSign className="w-4 h-4 text-primary" />
-                        <span className="font-medium">Compensation</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {analysis.compensation?.description || "Not specified"}
-                      </p>
-                      {analysis.compensation?.details?.length > 0 && (
-                        <ul className="mt-2 space-y-1">
-                          {analysis.compensation.details.slice(0, 3).map((detail: string, i: number) => (
-                            <li key={i} className="text-xs text-muted-foreground">
-                              • {detail}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-
-                    {/* Important Dates */}
-                    <div className="p-4 rounded-lg bg-muted/50">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Calendar className="w-4 h-4 text-primary" />
-                        <span className="font-medium">Important Dates</span>
-                      </div>
-                      <div className="space-y-1">
-                        {analysis.dates?.slice(0, 3).map((date: string, i: number) => (
-                          <p key={i} className="text-sm text-muted-foreground">
-                            {date}
-                          </p>
-                        ))}
-                        {(!analysis.dates || analysis.dates.length === 0) && (
-                          <p className="text-sm text-muted-foreground">No specific dates mentioned</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)}>
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <h1
+                className="text-2xl font-bold truncate cursor-pointer hover:text-primary"
+                onClick={() => setIsEditing(true)}
+                title="Click to rename"
+              >
+                {file.file_name}
+              </h1>
             )}
           </div>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" size="sm">
+              <a href={file.storage_path} target="_blank" rel="noopener noreferrer">
+                <Download className="w-4 h-4 mr-2" />
+                Download
+              </a>
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete File</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete "{file.file_name}"? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
 
-          {/* Analysis & Chat Sidebar */}
-          <div className="space-y-6">
-            {/* AI Analysis */}
+        {/* File Info */}
+        <Card className="mb-6">
+          <CardContent className="pt-6">
+            <div className="flex flex-wrap gap-6">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm">{formatFileSize(file.file_size)}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm">{new Date(file.created_at).toLocaleDateString()}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <FolderOpen className="w-4 h-4 text-muted-foreground" />
+                <Select value={file.folder_id || "none"} onValueChange={handleFolderChange}>
+                  <SelectTrigger className="w-[180px] h-8">
+                    <SelectValue placeholder="No folder" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No folder</SelectItem>
+                    {folders.map((folder) => (
+                      <SelectItem key={folder.id} value={folder.id}>
+                        {folder.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Main Content */}
+        <div className="grid lg:grid-cols-2 gap-6">
+          {/* Document Viewer */}
+          <div>
             <Card>
-              <CardHeader>
+              <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Brain className="w-5 h-5 text-primary" />
-                    AI Analysis
-                  </CardTitle>
-                  {file.analysis_status === "completed" && (
-                    <Badge className="bg-green-500/10 text-green-500">
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      Complete
-                    </Badge>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                {analysis ? (
-                  <Tabs defaultValue="summary" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
-                      <TabsTrigger value="summary">Summary</TabsTrigger>
-                      <TabsTrigger value="terms">Terms</TabsTrigger>
-                      <TabsTrigger value="risks">Risks</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="summary" className="mt-4">
-                      <div className="space-y-4">
-                        <div>
-                          <h4 className="font-medium mb-2">Overview</h4>
-                          <p className="text-sm text-muted-foreground">{analysis.summary}</p>
-                        </div>
-                        {analysis.rights_granted?.length > 0 && (
-                          <div>
-                            <h4 className="font-medium mb-2">Rights Granted</h4>
-                            <ul className="space-y-1">
-                              {analysis.rights_granted.slice(0, 5).map((right: string, i: number) => (
-                                <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
-                                  <CheckCircle className="w-3 h-3 text-green-500 mt-1 shrink-0" />
-                                  {right}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    </TabsContent>
-                    <TabsContent value="terms" className="mt-4">
-                      <div className="space-y-2">
-                        {analysis.key_terms?.length > 0 ? (
-                          analysis.key_terms.map((term: string, i: number) => (
-                            <div key={i} className="p-2 rounded bg-muted/50">
-                              <p className="text-sm">{term}</p>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-sm text-muted-foreground">No key terms identified</p>
-                        )}
-                      </div>
-                    </TabsContent>
-                    <TabsContent value="risks" className="mt-4">
-                      <div className="space-y-2">
-                        {analysis.risks?.length > 0 ? (
-                          analysis.risks.map((risk: string, i: number) => (
-                            <div key={i} className="flex items-start gap-2 p-2 rounded bg-destructive/10">
-                              <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
-                              <p className="text-sm">{risk}</p>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-sm text-muted-foreground">No significant risks identified</p>
-                        )}
-                      </div>
-                    </TabsContent>
-                  </Tabs>
-                ) : (
-                  <div className="text-center py-8">
-                    <Brain className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-                    <p className="text-sm text-muted-foreground mb-3">
-                      AI analysis will appear here after you analyze the document
-                    </p>
+                  <CardTitle className="text-lg">Document Viewer</CardTitle>
+                  {hasSubscription ? (
                     <Button onClick={handleAnalyze} disabled={analyzing} size="sm">
                       {analyzing ? (
                         <>
@@ -746,99 +536,249 @@ export default function FileViewerPage() {
                         </>
                       ) : (
                         <>
-                          <Sparkles className="w-4 h-4 mr-2" />
-                          Start Analysis
+                          <Brain className="w-4 h-4 mr-2" />
+                          {file.analysis_result ? "Re-analyze" : "Analyze Contract"}
                         </>
                       )}
                     </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Chat */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="w-5 h-5 text-primary" />
-                  Ask Questions
-                </CardTitle>
-                <CardDescription>Chat with AI about this contract</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Suggested Questions */}
-                  {chatMessages.length === 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs text-muted-foreground">Suggested questions:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {suggestedQuestions.slice(0, 3).map((q, i) => (
-                          <Button
-                            key={i}
-                            variant="outline"
-                            size="sm"
-                            className="text-xs h-auto py-1.5 px-2 bg-transparent"
-                            onClick={() => handleSuggestedQuestion(q)}
-                          >
-                            {q}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Chat Messages */}
-                  <ScrollArea className="h-[300px] border rounded-lg p-3">
-                    <div className="space-y-3">
-                      {chatMessages.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground text-sm">
-                          Ask a question about this contract
-                        </div>
-                      ) : (
-                        chatMessages.map((msg, i) => (
-                          <div
-                            key={i}
-                            className={`p-3 rounded-lg ${msg.role === "user" ? "bg-primary/10 ml-4" : "bg-muted mr-4"}`}
-                          >
-                            <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                          </div>
-                        ))
-                      )}
-                      {chatLoading && (
-                        <div className="flex items-center gap-2 p-3 bg-muted rounded-lg mr-4">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span className="text-sm">Thinking...</span>
-                        </div>
-                      )}
-                      <div ref={chatEndRef} />
-                    </div>
-                  </ScrollArea>
-
-                  {/* Chat Input */}
-                  <form onSubmit={handleChatSubmit} className="flex gap-2">
-                    <Input
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      placeholder="Ask about this contract..."
-                      disabled={chatLoading || !file.extracted_text}
-                      className="flex-1"
-                    />
-                    <Button
-                      type="submit"
-                      size="icon"
-                      disabled={chatLoading || !chatInput.trim() || !file.extracted_text}
-                    >
-                      <Send className="w-4 h-4" />
+                  ) : (
+                    <Button size="sm" variant="outline" asChild>
+                      <Link href="/pricing">
+                        <Lock className="w-4 h-4 mr-2" />
+                        Unlock Analysis
+                      </Link>
                     </Button>
-                  </form>
-                  {!file.extracted_text && (
-                    <p className="text-xs text-muted-foreground text-center">
-                      Analyze the document first to enable chat
-                    </p>
                   )}
                 </div>
-              </CardContent>
+              </CardHeader>
+              <CardContent>{renderPdfViewer()}</CardContent>
             </Card>
+          </div>
+
+          {/* Analysis & Chat */}
+          <div>
+            <Tabs defaultValue="analysis" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="analysis">
+                  <Brain className="w-4 h-4 mr-2" />
+                  Analysis
+                </TabsTrigger>
+                <TabsTrigger value="chat">
+                  <MessageSquare className="w-4 h-4 mr-2" />
+                  Ask Questions
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="analysis" className="mt-4">
+                {!hasSubscription ? (
+                  <SubscriptionPaywall feature="Contract Analysis" />
+                ) : analysisResult ? (
+                  <div className="space-y-4">
+                    {/* Contract Overview */}
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-base">Contract Overview</CardTitle>
+                          <Badge variant="secondary">{analysisResult.contract_type}</Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{analysisResult.summary}</p>
+
+                        {analysisResult.parties?.length > 0 && (
+                          <div className="mt-4 pt-4 border-t">
+                            <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                              <Users className="w-4 h-4" /> Parties Involved
+                            </h4>
+                            <div className="flex flex-wrap gap-2">
+                              {analysisResult.parties.map((party: any, i: number) => (
+                                <Badge key={i} variant="outline">
+                                  {party.name} ({party.role})
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {analysisResult.duration && (
+                          <div className="mt-4 pt-4 border-t flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm">
+                              <strong>Duration:</strong> {analysisResult.duration}
+                            </span>
+                          </div>
+                        )}
+
+                        {analysisResult.compensation?.description && (
+                          <div className="mt-4 pt-4 border-t">
+                            <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                              <DollarSign className="w-4 h-4" /> Compensation
+                            </h4>
+                            <p className="text-sm text-muted-foreground">{analysisResult.compensation.description}</p>
+                            {analysisResult.compensation.details?.length > 0 && (
+                              <ul className="mt-2 space-y-1">
+                                {analysisResult.compensation.details.map((detail: string, i: number) => (
+                                  <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
+                                    <span className="text-primary">•</span> {detail}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Key Terms */}
+                    {analysisResult.key_terms?.length > 0 && (
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base">Key Terms</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex flex-wrap gap-2">
+                            {analysisResult.key_terms.map((term: string, i: number) => (
+                              <Badge key={i} variant="secondary">
+                                {term}
+                              </Badge>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Obligations */}
+                    {analysisResult.obligations?.length > 0 && (
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base">Obligations</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ul className="space-y-2">
+                            {analysisResult.obligations.map((ob: any, i: number) => (
+                              <li key={i} className="text-sm flex items-start gap-2">
+                                <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                                <span>
+                                  <strong>{ob.party}:</strong> {ob.obligation}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Risks */}
+                    {analysisResult.risks?.length > 0 && (
+                      <Card className="border-amber-500/30">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4 text-amber-500" />
+                            Potential Risks
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ul className="space-y-2">
+                            {analysisResult.risks.map((risk: string, i: number) => (
+                              <li key={i} className="text-sm flex items-start gap-2">
+                                <Shield className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                                {risk}
+                              </li>
+                            ))}
+                          </ul>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                ) : (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="text-center py-8">
+                        <Brain className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                        <h3 className="font-semibold mb-2">No Analysis Yet</h3>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Click "Analyze Contract" to get AI-powered insights including parties, terms, obligations, and
+                          potential risks.
+                        </p>
+                        <Button onClick={handleAnalyze} disabled={analyzing}>
+                          {analyzing ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Brain className="w-4 h-4 mr-2" />
+                          )}
+                          {analyzing ? "Analyzing..." : "Analyze Contract"}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+
+              <TabsContent value="chat" className="mt-4">
+                {!hasSubscription ? (
+                  <SubscriptionPaywall feature="Contract Chat" />
+                ) : (
+                  <Card className="h-[600px] flex flex-col">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">Ask Questions About This Contract</CardTitle>
+                      <CardDescription>Get instant answers about terms, obligations, or any clause</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex-1 flex flex-col min-h-0">
+                      <ScrollArea className="flex-1 pr-4">
+                        {chatMessages.length === 0 ? (
+                          <div className="text-center py-8">
+                            <MessageSquare className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                            <p className="text-sm text-muted-foreground mb-4">Ask anything about this contract</p>
+                            <div className="flex flex-wrap gap-2 justify-center">
+                              {[
+                                "What are the key obligations?",
+                                "Explain the termination clause",
+                                "What are the payment terms?",
+                              ].map((q) => (
+                                <Button key={q} variant="outline" size="sm" onClick={() => setChatInput(q)}>
+                                  {q}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {chatMessages.map((msg, i) => (
+                              <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                                <div
+                                  className={`max-w-[80%] rounded-lg px-4 py-2 ${msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"}`}
+                                >
+                                  <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                                </div>
+                              </div>
+                            ))}
+                            {chatLoading && (
+                              <div className="flex justify-start">
+                                <div className="bg-muted rounded-lg px-4 py-2">
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                </div>
+                              </div>
+                            )}
+                            <div ref={chatEndRef} />
+                          </div>
+                        )}
+                      </ScrollArea>
+                      <form onSubmit={handleChatSubmit} className="mt-4 flex gap-2">
+                        <Input
+                          value={chatInput}
+                          onChange={(e) => setChatInput(e.target.value)}
+                          placeholder="Ask a question..."
+                          disabled={chatLoading}
+                        />
+                        <Button type="submit" size="icon" disabled={chatLoading || !chatInput.trim()}>
+                          <Send className="w-4 h-4" />
+                        </Button>
+                      </form>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </div>

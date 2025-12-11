@@ -11,7 +11,7 @@ import { saveContract } from "@/lib/contract-store"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, FileText, Eye, Info, Lock, Zap, Crown, Loader2, Gift } from "lucide-react"
+import { ArrowLeft, FileText, Eye, Info, Lock, Zap, Crown, Loader2, Check } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { createBrowserClient } from "@supabase/ssr"
@@ -34,7 +34,6 @@ export default function GenerateContractPage() {
   const [canGenerate, setCanGenerate] = useState(false)
   const [subscriptionStatus, setSubscriptionStatus] = useState<string>("free")
   const [contractsRemaining, setContractsRemaining] = useState(0)
-  const [freeContractAvailable, setFreeContractAvailable] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [purchaseLoadingType, setPurchaseLoadingType] = useState<"per_contract" | "unlimited" | null>(null)
 
@@ -61,7 +60,6 @@ export default function GenerateContractPage() {
         setCanGenerate(data.canGenerate)
         setSubscriptionStatus(data.status)
         setContractsRemaining(data.contractsRemaining || 0)
-        setFreeContractAvailable(data.freeContractAvailable || false)
       } catch (error) {
         console.error("Failed to check subscription:", error)
       }
@@ -137,11 +135,8 @@ export default function GenerateContractPage() {
       const creditRes = await fetch("/api/use-contract-credit", { method: "POST" })
       const creditData = await creditRes.json()
 
-      if (creditData.usedFreeContract) {
-        toast({
-          title: "Free Contract Used",
-          description: "You've used your free monthly contract. It will reset next month!",
-        })
+      if (!creditRes.ok) {
+        throw new Error(creditData.error || "No credits available")
       }
 
       const response = await fetch("/api/generate-contract", {
@@ -221,14 +216,10 @@ export default function GenerateContractPage() {
           })
         }
 
-        if (creditData.usedFreeContract) {
-          setFreeContractAvailable(false)
-          if (subscriptionStatus === "free" && contractsRemaining === 0) {
-            setCanGenerate(false)
-          }
-        } else if (subscriptionStatus === "per_contract") {
+        // Update remaining credits display
+        if (subscriptionStatus === "per_contract") {
           setContractsRemaining((prev) => Math.max(0, prev - 1))
-          if (contractsRemaining <= 1 && !freeContractAvailable) {
+          if (contractsRemaining <= 1) {
             setCanGenerate(false)
           }
         }
@@ -264,7 +255,7 @@ export default function GenerateContractPage() {
       return (
         <div className="flex items-center gap-2 text-amber-500">
           <Crown className="w-4 h-4" />
-          <span className="text-sm font-medium">Unlimited Plan Active</span>
+          <span className="text-sm font-medium">Unlimited Pro Active</span>
         </div>
       )
     }
@@ -275,17 +266,7 @@ export default function GenerateContractPage() {
           <Zap className="w-4 h-4" />
           <span className="text-sm font-medium">
             {contractsRemaining} credit{contractsRemaining !== 1 ? "s" : ""} remaining
-            {freeContractAvailable && " + 1 free"}
           </span>
-        </div>
-      )
-    }
-
-    if (freeContractAvailable) {
-      return (
-        <div className="flex items-center gap-2 text-green-500">
-          <Gift className="w-4 h-4" />
-          <span className="text-sm font-medium">1 free contract available this month</span>
         </div>
       )
     }
@@ -373,23 +354,42 @@ export default function GenerateContractPage() {
               <Card className="bg-card border-border">
                 <CardContent className="py-12">
                   <div className="text-center mb-8">
-                    <Lock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-foreground mb-2">Purchase Required</h3>
-                    <p className="text-muted-foreground">Choose a plan to generate this contract</p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Your free monthly contract has been used. It resets next month!
+                    <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                      <FileText className="w-8 h-8 text-primary" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-foreground mb-2">Generate Your Contract</h3>
+                    <p className="text-muted-foreground max-w-md mx-auto">
+                      Get a professionally crafted, AI-generated contract customized to your specific needs
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-xl mx-auto">
-                    <Card className="bg-secondary/30 border-border">
-                      <CardContent className="pt-6 text-center">
-                        <Zap className="w-8 h-8 text-primary mx-auto mb-3" />
-                        <h4 className="font-semibold text-foreground mb-1">Single Contract</h4>
-                        <p className="text-2xl font-bold text-foreground mb-2">$9.99</p>
-                        <p className="text-sm text-muted-foreground mb-4">One-time purchase</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+                    {/* Single Contract */}
+                    <Card className="bg-card border-border relative overflow-hidden">
+                      <CardContent className="pt-6">
+                        <div className="text-center mb-6">
+                          <Zap className="w-10 h-10 text-primary mx-auto mb-3" />
+                          <h4 className="text-lg font-semibold text-foreground mb-1">Single Contract</h4>
+                          <p className="text-3xl font-bold text-foreground">$19.99</p>
+                          <p className="text-sm text-muted-foreground">one-time</p>
+                        </div>
+                        <ul className="space-y-3 mb-6">
+                          <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Check className="w-4 h-4 text-green-500" />
+                            <span>1 AI-generated contract</span>
+                          </li>
+                          <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Check className="w-4 h-4 text-green-500" />
+                            <span>Customized to your details</span>
+                          </li>
+                          <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Check className="w-4 h-4 text-green-500" />
+                            <span>PDF download included</span>
+                          </li>
+                        </ul>
                         <Button
-                          className="w-full bg-primary hover:bg-primary/90"
+                          className="w-full bg-transparent"
+                          variant="outline"
                           onClick={() => handlePurchase("per_contract")}
                           disabled={purchaseLoadingType !== null}
                         >
@@ -402,57 +402,60 @@ export default function GenerateContractPage() {
                       </CardContent>
                     </Card>
 
-                    <Card className="bg-secondary/30 border-primary/50 border-2">
-                      <CardContent className="pt-6 text-center">
-                        <Crown className="w-8 h-8 text-amber-500 mx-auto mb-3" />
-                        <h4 className="font-semibold text-foreground mb-1">Unlimited</h4>
-                        <p className="text-2xl font-bold text-foreground mb-2">
-                          $19.99<span className="text-sm font-normal">/mo</span>
-                        </p>
-                        <p className="text-sm text-muted-foreground mb-4">Best value</p>
+                    {/* Unlimited Pro - Highlighted */}
+                    <Card className="bg-gradient-to-b from-amber-500/10 to-transparent border-amber-500/50 border-2 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 bg-amber-500 text-black text-xs font-bold px-3 py-1 rounded-bl-lg">
+                        BEST VALUE
+                      </div>
+                      <CardContent className="pt-6">
+                        <div className="text-center mb-6">
+                          <Crown className="w-10 h-10 text-amber-500 mx-auto mb-3" />
+                          <h4 className="text-lg font-semibold text-foreground mb-1">Unlimited Pro</h4>
+                          <p className="text-3xl font-bold text-foreground">
+                            $9.99<span className="text-base font-normal text-muted-foreground">/mo</span>
+                          </p>
+                          <p className="text-sm text-muted-foreground">cancel anytime</p>
+                        </div>
+                        <ul className="space-y-3 mb-6">
+                          <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Check className="w-4 h-4 text-amber-500" />
+                            <span className="font-medium text-foreground">Unlimited contracts</span>
+                          </li>
+                          <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Check className="w-4 h-4 text-amber-500" />
+                            <span>AI contract analysis</span>
+                          </li>
+                          <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Check className="w-4 h-4 text-amber-500" />
+                            <span>Priority support</span>
+                          </li>
+                        </ul>
                         <Button
-                          className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-black"
+                          className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-black font-semibold"
                           onClick={() => handlePurchase("unlimited")}
                           disabled={purchaseLoadingType !== null}
                         >
                           {purchaseLoadingType === "unlimited" ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
                           ) : (
-                            "Subscribe"
+                            "Subscribe Now"
                           )}
                         </Button>
                       </CardContent>
                     </Card>
                   </div>
 
-                  <p className="text-center text-sm text-muted-foreground mt-6">
-                    Or{" "}
-                    <Link href={`/templates`} className="text-primary hover:underline">
-                      download the free template
+                  <p className="text-center text-sm text-muted-foreground mt-8">
+                    Want just the template?{" "}
+                    <Link href="/templates" className="text-primary hover:underline font-medium">
+                      Download free templates
                     </Link>{" "}
                     without AI customization
                   </p>
                 </CardContent>
               </Card>
             ) : (
-              <>
-                {freeContractAvailable && subscriptionStatus === "free" && (
-                  <Card className="bg-green-500/10 border-green-500/30 mb-6">
-                    <CardContent className="py-4">
-                      <div className="flex items-center gap-3">
-                        <Gift className="w-6 h-6 text-green-500" />
-                        <div>
-                          <p className="font-medium text-foreground">Free Contract Available!</p>
-                          <p className="text-sm text-muted-foreground">
-                            You have 1 free AI-generated contract this month. Use it wisely!
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-                <ContractForm contract={contract} onSubmit={handleSubmit} isSubmitting={isSubmitting} />
-              </>
+              <ContractForm contract={contract} onSubmit={handleSubmit} isSubmitting={isSubmitting} />
             )}
           </div>
         </div>

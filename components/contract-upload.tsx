@@ -17,6 +17,7 @@ export function ContractUpload({ onUpload }: ContractUploadProps) {
   const router = useRouter()
   const [isDragging, setIsDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [uploadStatus, setUploadStatus] = useState("")
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -49,6 +50,7 @@ export function ContractUpload({ onUpload }: ContractUploadProps) {
     if (!selectedFile) return
 
     setUploading(true)
+    setUploadStatus("Uploading file...")
 
     try {
       const supabase = createClient()
@@ -72,22 +74,43 @@ export function ContractUpload({ onUpload }: ContractUploadProps) {
       let fileUrl = ""
 
       if (uploadError) {
-        // If storage bucket doesn't exist, use a data URL as fallback
         console.warn("Storage upload failed, using blob URL:", uploadError)
         fileUrl = URL.createObjectURL(selectedFile)
       } else {
-        // Get public URL
         const {
           data: { publicUrl },
         } = supabase.storage.from("contract-files").getPublicUrl(fileName)
         fileUrl = publicUrl
       }
 
+      setUploadStatus("Processing document with AI...")
+
+      let extractedText = ""
+      try {
+        const formData = new FormData()
+        formData.append("file", selectedFile)
+
+        const processResponse = await fetch("/api/process-document", {
+          method: "POST",
+          body: formData,
+        })
+
+        if (processResponse.ok) {
+          const processData = await processResponse.json()
+          extractedText = processData.content || ""
+        }
+      } catch (processError) {
+        console.warn("Document processing failed:", processError)
+      }
+
+      setUploadStatus("Saving to database...")
+
       const uploadedFile = await saveUploadedFile({
         file_name: selectedFile.name,
         file_type: selectedFile.type || `application/${fileExt}`,
         file_size: selectedFile.size,
         storage_path: fileUrl,
+        extracted_text: extractedText, // Save extracted text
       })
 
       if (uploadedFile) {
@@ -96,9 +119,11 @@ export function ContractUpload({ onUpload }: ContractUploadProps) {
       }
     } catch (error) {
       console.error("Upload error:", error)
+      setUploadStatus("Upload failed")
     } finally {
       setSelectedFile(null)
       setUploading(false)
+      setUploadStatus("")
     }
   }
 
@@ -120,14 +145,19 @@ export function ContractUpload({ onUpload }: ContractUploadProps) {
           }`}
         >
           {selectedFile ? (
-            <div className="flex items-center justify-center gap-4">
+            <div className="flex flex-col items-center gap-4">
               <div className="flex items-center gap-3 bg-secondary/50 px-4 py-2 rounded-lg">
                 <FileText className="w-5 h-5 text-primary" />
                 <span className="text-foreground">{selectedFile.name}</span>
-                <button onClick={() => setSelectedFile(null)} className="text-muted-foreground hover:text-foreground">
+                <button
+                  onClick={() => setSelectedFile(null)}
+                  className="text-muted-foreground hover:text-foreground"
+                  disabled={uploading}
+                >
                   <X className="w-4 h-4" />
                 </button>
               </div>
+              {uploadStatus && <p className="text-sm text-muted-foreground">{uploadStatus}</p>}
               <Button
                 onClick={handleUpload}
                 disabled={uploading}
@@ -136,12 +166,12 @@ export function ContractUpload({ onUpload }: ContractUploadProps) {
                 {uploading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Uploading...
+                    Processing...
                   </>
                 ) : (
                   <>
                     <Upload className="w-4 h-4 mr-2" />
-                    Upload & Analyze
+                    Upload & Process
                   </>
                 )}
               </Button>

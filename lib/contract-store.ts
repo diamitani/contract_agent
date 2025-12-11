@@ -78,18 +78,24 @@ export async function saveContract(
 
   if (!user) return null
 
-  const { data, error } = await supabase
-    .from("contracts")
-    .insert({
-      user_id: user.id,
-      title: contract.title,
-      contract_type: contract.contract_type,
-      content: contract.content,
-      form_data: contract.form_data,
-      app_id: APP_ID, // Added app_id to track which platform created the contract
-    })
-    .select()
-    .single()
+  const insertData: Record<string, unknown> = {
+    user_id: user.id,
+    title: contract.title,
+    contract_type: contract.contract_type,
+    content: contract.content,
+    form_data: contract.form_data,
+    app_id: APP_ID,
+  }
+
+  let { data, error } = await supabase.from("contracts").insert(insertData).select().single()
+
+  // If app_id column doesn't exist, retry without it
+  if (error?.message?.includes("app_id") || error?.code === "42703") {
+    const { app_id, ...insertWithoutAppId } = insertData
+    const result = await supabase.from("contracts").insert(insertWithoutAppId).select().single()
+    data = result.data
+    error = result.error
+  }
 
   if (error) {
     console.error("Error saving contract:", error)
@@ -176,15 +182,28 @@ export async function saveUploadedFile(
 
   if (!user) return null
 
-  const { data, error } = await supabase
-    .from("uploaded_files")
-    .insert({
-      user_id: user.id,
-      ...file,
-      app_id: APP_ID, // Added app_id to track which platform uploaded the file
-    })
-    .select()
-    .single()
+  const insertData: Record<string, unknown> = {
+    user_id: user.id,
+    file_name: file.file_name,
+    file_type: file.file_type,
+    file_size: file.file_size,
+    storage_path: file.storage_path,
+    folder_id: file.folder_id,
+    analysis_status: file.analysis_status,
+    analysis_result: file.analysis_result,
+    extracted_text: file.extracted_text,
+    app_id: APP_ID,
+  }
+
+  let { data, error } = await supabase.from("uploaded_files").insert(insertData).select().single()
+
+  // If app_id column doesn't exist, retry without it
+  if (error?.message?.includes("app_id") || error?.code === "42703") {
+    const { app_id, ...insertWithoutAppId } = insertData
+    const result = await supabase.from("uploaded_files").insert(insertWithoutAppId).select().single()
+    data = result.data
+    error = result.error
+  }
 
   if (error) {
     console.error("Error saving uploaded file:", error)
@@ -366,12 +385,20 @@ export async function trackEvent(eventType: string, eventData: Record<string, un
   if (!user) return
 
   try {
-    await supabase.from("analytics_events").insert({
+    const { error } = await supabase.from("analytics_events").insert({
       user_id: user.id,
       event_type: eventType,
       event_data: eventData,
-      app_id: APP_ID, // Added app_id to track which platform generated the event
+      app_id: APP_ID,
     })
+
+    if (error?.message?.includes("app_id") || error?.code === "42703") {
+      await supabase.from("analytics_events").insert({
+        user_id: user.id,
+        event_type: eventType,
+        event_data: eventData,
+      })
+    }
   } catch (err) {
     console.warn("Analytics table not available:", err)
   }

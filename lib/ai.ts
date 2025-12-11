@@ -1,25 +1,19 @@
 import { generateText } from "ai"
-import { createOpenAI } from "@ai-sdk/openai"
+import { createGoogleGenerativeAI } from "@ai-sdk/google"
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ""
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || ""
 
-function getOpenAIClient() {
-  const key = process.env.OPENAI_API_KEY || OPENAI_API_KEY
+function getGeminiClient() {
+  const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || GEMINI_API_KEY
 
   if (!key) {
-    throw new Error("OPENAI_API_KEY environment variable is required")
+    throw new Error("GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY environment variable is required")
   }
 
-  if (key.startsWith("AIzaSy")) {
-    throw new Error(
-      "OPENAI_API_KEY appears to be a Google/Gemini API key. Please set a valid OpenAI API key (starts with 'sk-').",
-    )
-  }
-
-  return createOpenAI({ apiKey: key })
+  return createGoogleGenerativeAI({ apiKey: key })
 }
 
-export type AIModel = "openai" | "gemini"
+export type AIModel = "gemini" | "openai"
 
 interface GenerateOptions {
   systemPrompt: string
@@ -34,33 +28,45 @@ export async function generateWithFallback(options: GenerateOptions): Promise<{
 }> {
   const { systemPrompt, userPrompt, maxOutputTokens = 4000, temperature = 0.3 } = options
 
-  const openai = getOpenAIClient()
-  const models = ["gpt-4o-mini", "gpt-3.5-turbo", "gpt-4o"]
+  const gemini = getGeminiClient()
+  // Try multiple Gemini models
+  const models = ["gemini-2.0-flash-exp", "gemini-1.5-flash", "gemini-1.5-pro"]
 
   let lastError: Error | null = null
 
   for (const modelName of models) {
     try {
-      console.log(`[AI] Trying model: ${modelName}`)
+      console.log(`[AI] Trying Gemini model: ${modelName}`)
       const result = await generateText({
-        model: openai(modelName),
+        model: gemini(modelName),
         system: systemPrompt,
         prompt: userPrompt,
         maxTokens: maxOutputTokens,
         temperature,
       })
 
-      if (result.text) {
-        console.log(`[AI] Success with model: ${modelName}`)
-        return { text: result.text, model: "openai" }
+      const responseText = result.text || ""
+
+      if (responseText.trim()) {
+        console.log(`[AI] Success with ${modelName}, length: ${responseText.length}`)
+        return { text: responseText, model: "gemini" }
+      } else {
+        console.log(`[AI] ${modelName} returned empty response`)
+        lastError = new Error("Empty response from model")
       }
     } catch (error) {
-      console.error(`[AI] ${modelName} failed:`, error instanceof Error ? error.message : error)
-      lastError = error instanceof Error ? error : new Error(String(error))
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      console.error(`[AI] ${modelName} error:`, errorMessage)
+      lastError = error instanceof Error ? error : new Error(errorMessage)
+
+      // Don't retry on auth errors
+      if (errorMessage.includes("401") || errorMessage.includes("API key") || errorMessage.includes("Unauthorized")) {
+        throw new Error("Gemini API authentication failed. Check your GEMINI_API_KEY.")
+      }
     }
   }
 
-  throw lastError || new Error("All OpenAI models failed. Please check your API key.")
+  throw lastError || new Error("All Gemini models failed")
 }
 
 export async function generateChat(options: {
@@ -71,7 +77,7 @@ export async function generateChat(options: {
 }): Promise<string> {
   const { systemPrompt, messages, maxOutputTokens = 2000, temperature = 0.7 } = options
 
-  const openai = getOpenAIClient()
+  const gemini = getGeminiClient()
 
   try {
     const conversationPrompt = messages
@@ -79,7 +85,7 @@ export async function generateChat(options: {
       .join("\n\n")
 
     const result = await generateText({
-      model: openai("gpt-4o-mini"),
+      model: gemini("gemini-2.0-flash-exp"),
       system: systemPrompt,
       prompt: conversationPrompt + "\n\nAssistant:",
       maxTokens: maxOutputTokens,
@@ -88,15 +94,33 @@ export async function generateChat(options: {
 
     return result.text || "I apologize, but I couldn't generate a response. Please try again."
   } catch (error) {
-    console.error("[AI] Chat error:", error)
-    throw new Error(error instanceof Error ? error.message : "Failed to generate chat response")
+    console.error("[AI] Gemini chat error:", error)
+    // Try fallback model
+    try {
+      const gemini = getGeminiClient()
+      const conversationPrompt = messages
+        .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+        .join("\n\n")
+
+      const result = await generateText({
+        model: gemini("gemini-1.5-flash"),
+        system: systemPrompt,
+        prompt: conversationPrompt + "\n\nAssistant:",
+        maxTokens: maxOutputTokens,
+        temperature,
+      })
+
+      return result.text || "I apologize, but I couldn't generate a response. Please try again."
+    } catch (fallbackError) {
+      throw new Error(error instanceof Error ? error.message : "Failed to generate chat response")
+    }
   }
 }
 
 export async function callOpenAI(endpoint: string, options: RequestInit): Promise<Response> {
-  const apiKey = process.env.OPENAI_API_KEY || OPENAI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
-    throw new Error("OPENAI_API_KEY environment variable is required")
+    throw new Error("OPENAI_API_KEY environment variable is required for contract generation")
   }
 
   const response = await fetch(`https://api.openai.com/v1${endpoint}`, {
@@ -117,14 +141,27 @@ export async function callGeminiDirect(options: {
 }): Promise<string> {
   const { prompt, systemPrompt, maxTokens = 2000 } = options
 
-  const openai = getOpenAIClient()
+  const gemini = getGeminiClient()
 
-  const result = await generateText({
-    model: openai("gpt-4o-mini"),
-    system: systemPrompt,
-    prompt,
-    maxTokens: maxTokens,
-  })
+  try {
+    const result = await generateText({
+      model: gemini("gemini-2.0-flash-exp"),
+      system: systemPrompt,
+      prompt,
+      maxTokens: maxTokens,
+    })
 
-  return result.text
+    return result.text
+  } catch (error) {
+    // Try fallback
+    console.error("[AI] Gemini direct error, trying fallback:", error)
+    const result = await generateText({
+      model: gemini("gemini-1.5-flash"),
+      system: systemPrompt,
+      prompt,
+      maxTokens: maxTokens,
+    })
+
+    return result.text
+  }
 }
