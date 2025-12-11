@@ -36,9 +36,10 @@ const plans = [
       "PDF download",
       "Save to dashboard",
     ],
-    cta: "Buy Now",
+    cta: "Choose Contract",
     popular: false,
     productType: "per_contract" as const,
+    href: "/generate",
     icon: Zap,
   },
   {
@@ -118,11 +119,9 @@ function PricingContent() {
   }, [supabase.auth])
 
   const handlePurchase = (productType: "per_contract" | "unlimited") => {
-    if (!user) {
-      // Not logged in - go to sign up with plan info
-      router.push(`/auth/sign-up?plan=${productType}`)
+    if (productType === "per_contract") {
+      router.push("/generate")
     } else {
-      // Logged in - go directly to embedded checkout
       router.push(`/checkout/${productType}`)
     }
   }
@@ -233,6 +232,16 @@ function PricingContent() {
                     className="w-full h-12 text-base font-semibold bg-secondary hover:bg-secondary/80 text-secondary-foreground"
                   >
                     <Link href="/templates">
+                      {plan.cta}
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Link>
+                  </Button>
+                ) : plan.productType === "per_contract" ? (
+                  <Button
+                    asChild
+                    className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90 text-primary-foreground"
+                  >
+                    <Link href="/generate">
                       {plan.cta}
                       <ArrowRight className="w-4 h-4 ml-2" />
                     </Link>

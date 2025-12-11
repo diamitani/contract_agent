@@ -292,7 +292,7 @@ export default function FileViewerPage() {
             </p>
           </div>
           <Button asChild>
-            <Link href="/pricing">
+            <Link href="/checkout/unlimited">
               <Lock className="w-4 h-4 mr-2" />
               Upgrade Now
             </Link>
@@ -543,7 +543,7 @@ export default function FileViewerPage() {
                     </Button>
                   ) : (
                     <Button size="sm" variant="outline" asChild>
-                      <Link href="/pricing">
+                      <Link href="/checkout/unlimited">
                         <Lock className="w-4 h-4 mr-2" />
                         Unlock Analysis
                       </Link>

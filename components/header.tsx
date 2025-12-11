@@ -145,9 +145,14 @@ export function Header() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
-                <Button asChild size="sm">
-                  <Link href="/auth/sign-in">Sign in</Link>
-                </Button>
+                <div className="flex items-center gap-3">
+                  <Button asChild variant="ghost" size="sm">
+                    <Link href="/auth/sign-in">Log in</Link>
+                  </Button>
+                  <Button asChild size="sm" className="bg-primary hover:bg-primary/90">
+                    <Link href="/auth/sign-up">Sign Up</Link>
+                  </Button>
+                </div>
               )}
             </>
           )}
@@ -270,11 +275,18 @@ export function Header() {
                   </div>
 
                   {!loading && !user && (
-                    <SheetClose asChild>
-                      <Button asChild className="w-full">
-                        <Link href="/auth/sign-in">Sign in</Link>
-                      </Button>
-                    </SheetClose>
+                    <div className="space-y-2">
+                      <SheetClose asChild>
+                        <Button asChild className="w-full bg-primary hover:bg-primary/90">
+                          <Link href="/auth/sign-up">Sign Up</Link>
+                        </Button>
+                      </SheetClose>
+                      <SheetClose asChild>
+                        <Button asChild variant="outline" className="w-full bg-transparent">
+                          <Link href="/auth/sign-in">Log in</Link>
+                        </Button>
+                      </SheetClose>
+                    </div>
                   )}
                 </div>
               </div>

@@ -176,7 +176,7 @@ export default async function ProfilePage() {
                   </div>
                   {profile?.subscription_status !== "unlimited" && (
                     <Button asChild size="sm" className="bg-primary hover:bg-primary/90">
-                      <Link href="/pricing">
+                      <Link href="/checkout/unlimited">
                         Upgrade
                         <ArrowRight className="w-4 h-4 ml-1" />
                       </Link>

@@ -15,6 +15,8 @@ export async function GET(request: NextRequest) {
       status: session.status,
       customer_email: session.customer_details?.email,
       payment_status: session.payment_status,
+      product_type: session.metadata?.product_type,
+      customer_id: session.customer as string,
     })
   } catch (error) {
     console.error("Failed to retrieve session:", error)

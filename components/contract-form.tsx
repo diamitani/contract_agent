@@ -9,16 +9,17 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { ChevronLeft, ChevronRight, Send, Loader2, MessageSquare, FileText } from "lucide-react"
+import { ChevronLeft, ChevronRight, Send, Loader2, MessageSquare, FileText, CreditCard, Zap, Crown } from "lucide-react"
 import type { ContractTemplate, ContractField } from "@/lib/contracts"
 
 interface ContractFormProps {
   contract: ContractTemplate
   onSubmit: (data: Record<string, string>) => Promise<void>
   isSubmitting: boolean
+  showPaymentPrompt?: boolean
 }
 
-export function ContractForm({ contract, onSubmit, isSubmitting }: ContractFormProps) {
+export function ContractForm({ contract, onSubmit, isSubmitting, showPaymentPrompt = false }: ContractFormProps) {
   const [formData, setFormData] = useState<Record<string, string>>({})
   const [currentStep, setCurrentStep] = useState(0)
   const [mode, setMode] = useState<"form" | "chat">("form")
@@ -171,6 +172,50 @@ export function ContractForm({ contract, onSubmit, isSubmitting }: ContractFormP
     )
   }
 
+  const renderGenerateButton = (isFullWidth = false) => {
+    if (showPaymentPrompt) {
+      return (
+        <Button
+          type="submit"
+          disabled={isSubmitting}
+          className={`bg-gradient-to-r from-primary to-amber-500 hover:from-primary/90 hover:to-amber-500/90 text-white font-semibold ${isFullWidth ? "w-full" : ""}`}
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Processing...
+            </>
+          ) : (
+            <>
+              <CreditCard className="w-4 h-4 mr-2" />
+              Generate Contract - $19.99
+            </>
+          )}
+        </Button>
+      )
+    }
+
+    return (
+      <Button
+        type="submit"
+        disabled={isSubmitting}
+        className={`bg-primary text-primary-foreground hover:bg-primary/90 ${isFullWidth ? "w-full" : ""}`}
+      >
+        {isSubmitting ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Generating...
+          </>
+        ) : (
+          <>
+            <Send className="w-4 h-4 mr-2" />
+            Generate Contract
+          </>
+        )}
+      </Button>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex gap-2 mb-6">
@@ -223,23 +268,7 @@ export function ContractForm({ contract, onSubmit, isSubmitting }: ContractFormP
                 </Button>
 
                 {currentStep === totalSteps - 1 ? (
-                  <Button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="bg-primary text-primary-foreground hover:bg-primary/90"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-4 h-4 mr-2" />
-                        Generate Contract
-                      </>
-                    )}
-                  </Button>
+                  renderGenerateButton()
                 ) : (
                   <Button
                     type="button"
@@ -251,6 +280,26 @@ export function ContractForm({ contract, onSubmit, isSubmitting }: ContractFormP
                   </Button>
                 )}
               </div>
+
+              {currentStep === totalSteps - 1 && showPaymentPrompt && (
+                <div className="border-t border-border pt-4 mt-4">
+                  <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-primary" />
+                      <span>
+                        Single: <strong className="text-foreground">$19.99</strong>
+                      </span>
+                    </div>
+                    <span className="text-border">|</span>
+                    <div className="flex items-center gap-2">
+                      <Crown className="w-4 h-4 text-amber-500" />
+                      <span>
+                        Unlimited: <strong className="text-amber-500">$9.99/mo</strong>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </form>
@@ -300,23 +349,27 @@ export function ContractForm({ contract, onSubmit, isSubmitting }: ContractFormP
             </form>
 
             {currentChatField >= contract.fields.length && (
-              <Button
-                onClick={() => onSubmit(formData)}
-                disabled={isSubmitting}
-                className="w-full mt-4 bg-primary text-primary-foreground hover:bg-primary/90"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4 mr-2" />
-                    Generate Contract
-                  </>
+              <div className="mt-4">
+                {renderGenerateButton(true)}
+
+                {showPaymentPrompt && (
+                  <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground mt-3">
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-primary" />
+                      <span>
+                        Single: <strong className="text-foreground">$19.99</strong>
+                      </span>
+                    </div>
+                    <span className="text-border">|</span>
+                    <div className="flex items-center gap-2">
+                      <Crown className="w-4 h-4 text-amber-500" />
+                      <span>
+                        Unlimited: <strong className="text-amber-500">$9.99/mo</strong>
+                      </span>
+                    </div>
+                  </div>
                 )}
-              </Button>
+              </div>
             )}
 
             <div className="mt-4 text-center">

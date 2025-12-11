@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { contractTemplates, type ContractTemplate } from "@/lib/contracts"
 import {
   deleteContract,
@@ -21,8 +22,9 @@ import {
   type UploadedFile,
   type Folder,
 } from "@/lib/contract-store"
-import { Search, FileText, FolderOpen, Upload, PlusCircle, LayoutDashboard } from "lucide-react"
+import { Search, FileText, FolderOpen, Upload, PlusCircle, LayoutDashboard, Crown, Zap } from "lucide-react"
 import type { User } from "@supabase/supabase-js"
+import Link from "next/link"
 
 interface DashboardClientProps {
   initialContracts: SavedContract[]
@@ -39,9 +41,14 @@ export function DashboardClient({ initialContracts, initialUploadedFiles, user }
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [previewContract, setPreviewContract] = useState<ContractTemplate | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [subscription, setSubscription] = useState<{ status: string; contractsRemaining: number } | null>(null)
 
   useEffect(() => {
     getFolders().then(setFolders)
+    fetch("/api/check-subscription")
+      .then((res) => res.json())
+      .then((data) => setSubscription(data))
+      .catch(console.error)
   }, [])
 
   const categories = Array.from(new Set(contractTemplates.map((c) => c.category)))
@@ -105,7 +112,7 @@ export function DashboardClient({ initialContracts, initialUploadedFiles, user }
           </div>
 
           {/* Stats */}
-          <div className="flex gap-6 mt-6">
+          <div className="flex flex-wrap gap-6 mt-6">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
                 <FileText className="w-4 h-4 text-primary" />
@@ -133,6 +140,28 @@ export function DashboardClient({ initialContracts, initialUploadedFiles, user }
                 <p className="text-xs text-muted-foreground">Folders</p>
               </div>
             </div>
+            {subscription && (
+              <div className="flex items-center gap-2 ml-auto">
+                {subscription.status === "unlimited" ? (
+                  <Badge className="bg-gradient-to-r from-amber-500 to-yellow-500 text-black">
+                    <Crown className="w-3 h-3 mr-1" />
+                    Unlimited Pro
+                  </Badge>
+                ) : subscription.status === "per_contract" && subscription.contractsRemaining > 0 ? (
+                  <Badge className="bg-primary/10 text-primary border-primary/20">
+                    <Zap className="w-3 h-3 mr-1" />
+                    {subscription.contractsRemaining} Credit{subscription.contractsRemaining !== 1 ? "s" : ""}
+                  </Badge>
+                ) : (
+                  <Button asChild size="sm" className="bg-gradient-to-r from-amber-500 to-yellow-500 text-black">
+                    <Link href="/checkout/unlimited">
+                      <Crown className="w-3 h-3 mr-1" />
+                      Upgrade
+                    </Link>
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -170,7 +199,13 @@ export function DashboardClient({ initialContracts, initialUploadedFiles, user }
               <div className="text-center py-16 bg-card border border-border rounded-lg">
                 <FolderOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-lg text-foreground mb-2">No saved contracts yet</p>
-                <p className="text-muted-foreground">Start creating contracts and they&apos;ll appear here</p>
+                <p className="text-muted-foreground mb-4">Start creating contracts and they&apos;ll appear here</p>
+                <Button asChild>
+                  <Link href="/generate">
+                    <PlusCircle className="w-4 h-4 mr-2" />
+                    Create Your First Contract
+                  </Link>
+                </Button>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -183,6 +218,25 @@ export function DashboardClient({ initialContracts, initialUploadedFiles, user }
 
           {/* Upload & Review Tab */}
           <TabsContent value="upload" className="space-y-6">
+            {subscription?.status !== "unlimited" && (
+              <Card className="bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border-amber-500/20">
+                <CardContent className="py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Crown className="w-5 h-5 text-amber-500" />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">Unlock AI Contract Analysis</p>
+                        <p className="text-xs text-muted-foreground">Upload and analyze contracts with Unlimited Pro</p>
+                      </div>
+                    </div>
+                    <Button asChild size="sm" className="bg-gradient-to-r from-amber-500 to-yellow-500 text-black">
+                      <Link href="/checkout/unlimited">Upgrade to Pro</Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
               {/* Folder Sidebar */}
               <Card className="lg:col-span-1">
@@ -239,6 +293,31 @@ export function DashboardClient({ initialContracts, initialUploadedFiles, user }
 
           {/* Create New Tab */}
           <TabsContent value="create" className="space-y-6">
+            {subscription?.status !== "unlimited" && subscription?.contractsRemaining === 0 && (
+              <Card className="bg-gradient-to-r from-primary/10 to-amber-500/10 border-primary/20">
+                <CardContent className="py-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Generate AI Contracts</p>
+                      <p className="text-xs text-muted-foreground">
+                        Fill out any form for free. Pay only when you're ready to generate.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <span className="text-muted-foreground">
+                        <Zap className="w-3 h-3 inline mr-1" />
+                        $19.99/contract
+                      </span>
+                      <span className="text-amber-500 font-medium">
+                        <Crown className="w-3 h-3 inline mr-1" />
+                        $9.99/mo unlimited
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <div className="flex flex-col md:flex-row gap-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />

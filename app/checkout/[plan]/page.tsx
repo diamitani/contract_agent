@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { loadStripe } from "@stripe/stripe-js"
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js"
@@ -8,9 +8,9 @@ import { createClient } from "@/lib/supabase/client"
 import { Header } from "@/components/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Loader2, Shield, Check, ArrowLeft } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Loader2, Shield, Check, ArrowLeft, Tag, CheckCircle, XCircle } from "lucide-react"
 import Link from "next/link"
-import Image from "next/image"
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 
@@ -44,27 +44,18 @@ export default function CheckoutPage() {
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  const [couponCode, setCouponCode] = useState("")
+  const [couponApplied, setCouponApplied] = useState<string | null>(null)
+  const [couponError, setCouponError] = useState<string | null>(null)
+  const [applyingCoupon, setApplyingCoupon] = useState(false)
+
   const plan = params.plan as "per_contract" | "unlimited"
   const contractSlug = searchParams.get("contract")
+  const returnToGenerate = searchParams.get("return_generate") === "true"
   const planDetails = PLAN_DETAILS[plan]
 
-  // Check auth and create checkout session
-  useEffect(() => {
-    const init = async () => {
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (!user) {
-        // Redirect to sign up with return URL
-        router.push(`/auth/sign-up?plan=${plan}${contractSlug ? `&contract=${contractSlug}` : ""}`)
-        return
-      }
-
-      setUser({ id: user.id, email: user.email || "" })
-
-      // Create checkout session
+  const createCheckoutSession = useCallback(
+    async (coupon?: string) => {
       try {
         const res = await fetch("/api/create-checkout-session", {
           method: "POST",
@@ -72,6 +63,7 @@ export default function CheckoutPage() {
           body: JSON.stringify({
             productType: plan,
             contractSlug,
+            couponCode: coupon,
           }),
         })
 
@@ -82,11 +74,29 @@ export default function CheckoutPage() {
         }
 
         setClientSecret(data.clientSecret)
+        return true
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong")
-      } finally {
-        setLoading(false)
+        return false
       }
+    },
+    [plan, contractSlug],
+  )
+
+  useEffect(() => {
+    const init = async () => {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (user) {
+        setUser({ id: user.id, email: user.email || "" })
+      }
+      // No redirect for guests - proceed to checkout
+
+      await createCheckoutSession()
+      setLoading(false)
     }
 
     if (plan && PLAN_DETAILS[plan]) {
@@ -94,7 +104,51 @@ export default function CheckoutPage() {
     } else {
       router.push("/pricing")
     }
-  }, [plan, contractSlug, router])
+  }, [plan, contractSlug, router, createCheckoutSession])
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return
+
+    setApplyingCoupon(true)
+    setCouponError(null)
+
+    try {
+      const res = await fetch("/api/create-checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productType: plan,
+          contractSlug,
+          couponCode: couponCode.trim().toUpperCase(),
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setCouponError(data.error || "Invalid coupon code")
+        return
+      }
+
+      setClientSecret(data.clientSecret)
+      setCouponApplied(couponCode.trim().toUpperCase())
+      setCouponError(null)
+    } catch (err) {
+      setCouponError("Failed to apply coupon")
+    } finally {
+      setApplyingCoupon(false)
+    }
+  }
+
+  const handleRemoveCoupon = async () => {
+    setApplyingCoupon(true)
+    setCouponApplied(null)
+    setCouponCode("")
+    setCouponError(null)
+
+    await createCheckoutSession()
+    setApplyingCoupon(false)
+  }
 
   if (!planDetails) {
     return null
@@ -153,7 +207,9 @@ export default function CheckoutPage() {
               <Card className="bg-card border-border sticky top-8">
                 <CardHeader>
                   <CardTitle className="text-xl">Order Summary</CardTitle>
-                  <CardDescription>Complete your purchase to get started</CardDescription>
+                  <CardDescription>
+                    {user ? "Complete your purchase" : "Pay securely, then create your account"}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {/* Plan details */}
@@ -165,6 +221,62 @@ export default function CheckoutPage() {
                       </div>
                       <span className="text-xl font-bold text-primary">{planDetails.price}</span>
                     </div>
+                    {couponApplied && (
+                      <div className="mt-3 flex items-center gap-2 text-sm text-green-500">
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Coupon {couponApplied} applied</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Promo code section */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <Tag className="w-4 h-4" />
+                      <span>Have a promo code?</span>
+                    </div>
+
+                    {couponApplied ? (
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          <span className="text-sm font-medium text-green-500">{couponApplied}</span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleRemoveCoupon}
+                          disabled={applyingCoupon}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          {applyingCoupon ? <Loader2 className="w-4 h-4 animate-spin" /> : "Remove"}
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Enter coupon code"
+                          value={couponCode}
+                          onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                          className="flex-1 bg-secondary/50"
+                          onKeyDown={(e) => e.key === "Enter" && handleApplyCoupon()}
+                        />
+                        <Button
+                          onClick={handleApplyCoupon}
+                          disabled={!couponCode.trim() || applyingCoupon}
+                          variant="outline"
+                        >
+                          {applyingCoupon ? <Loader2 className="w-4 h-4 animate-spin" /> : "Apply"}
+                        </Button>
+                      </div>
+                    )}
+
+                    {couponError && (
+                      <div className="flex items-center gap-2 text-sm text-destructive">
+                        <XCircle className="w-4 h-4" />
+                        <span>{couponError}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Features */}
@@ -184,20 +296,25 @@ export default function CheckoutPage() {
                       <Shield className="w-4 h-4 text-green-500" />
                       <span>Secure checkout powered by Stripe</span>
                     </div>
-                    <div className="flex items-center gap-4 opacity-60">
-                      <Image src="/visa-application-process.png" alt="Visa" width={40} height={24} />
-                      <Image src="/mastercard-logo-abstract.png" alt="Mastercard" width={40} height={24} />
-                      <Image src="/abstract-credit-card-design.png" alt="Amex" width={40} height={24} />
-                    </div>
                   </div>
 
-                  {/* User info */}
-                  {user && (
-                    <div className="pt-4 border-t border-border">
-                      <p className="text-xs text-muted-foreground">Purchasing as:</p>
-                      <p className="text-sm text-foreground font-medium">{user.email}</p>
-                    </div>
-                  )}
+                  {/* User info or guest notice */}
+                  <div className="pt-4 border-t border-border">
+                    {user ? (
+                      <>
+                        <p className="text-xs text-muted-foreground">Purchasing as:</p>
+                        <p className="text-sm text-foreground font-medium">{user.email}</p>
+                      </>
+                    ) : (
+                      <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
+                        <p className="text-sm text-foreground">
+                          {returnToGenerate
+                            ? "After payment, create your account and your contract will be generated automatically!"
+                            : "After payment, you'll create your account to access your purchase."}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -207,7 +324,7 @@ export default function CheckoutPage() {
               <Card className="bg-card border-border overflow-hidden">
                 <CardHeader className="border-b border-border">
                   <CardTitle>Payment Details</CardTitle>
-                  <CardDescription>Enter your card information to complete purchase</CardDescription>
+                  <CardDescription>Enter your payment information to complete purchase</CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
                   {clientSecret && (
