@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Download, FileText, Brain, Loader2, ChevronDown, ChevronUp } from "lucide-react"
+import { FileText, Brain, Loader2, ChevronDown, ChevronUp, Lock } from "lucide-react"
 import type { ContractTemplate } from "@/lib/contracts"
 
 interface PDFPreviewModalProps {
@@ -49,6 +49,8 @@ export function PDFPreviewModal({ contract, open, onOpenChange }: PDFPreviewModa
 
   if (!contract) return null
 
+  const sampleContent = getSampleContractContent(contract.slug, contract.name)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl h-[80vh] bg-card border-border">
@@ -58,7 +60,7 @@ export function PDFPreviewModal({ contract, open, onOpenChange }: PDFPreviewModa
             {contract.name}
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Preview the template and get AI-powered analysis
+            Preview the template structure - purchase to get your customized contract
           </DialogDescription>
         </DialogHeader>
 
@@ -79,32 +81,48 @@ export function PDFPreviewModal({ contract, open, onOpenChange }: PDFPreviewModa
           </TabsList>
 
           <TabsContent value="preview" className="flex-1 mt-4">
-            <div className="bg-secondary/50 rounded-lg p-6 h-[50vh] overflow-auto">
-              <div className="prose prose-invert max-w-none">
-                <h2 className="text-foreground">{contract.name}</h2>
-                <p className="text-muted-foreground">{contract.description}</p>
-                <hr className="border-border my-4" />
-                <h3 className="text-foreground">Required Information</h3>
-                <p className="text-muted-foreground text-sm mb-4">
-                  The following fields will need to be completed to generate this contract:
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  {contract.fields.map((field) => (
-                    <div key={field.id} className="bg-card rounded-md p-3 border border-border">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-foreground">{field.label}</span>
-                        {field.required && <span className="text-xs text-primary">Required</span>}
-                      </div>
-                      {field.description && <p className="text-xs text-muted-foreground mt-1">{field.description}</p>}
-                    </div>
-                  ))}
+            <div className="relative bg-secondary/50 rounded-lg p-6 h-[50vh] overflow-auto">
+              {/* Watermark overlays */}
+              <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center opacity-10">
+                <div className="text-6xl font-bold text-foreground rotate-[-45deg] select-none">SAMPLE PREVIEW</div>
+              </div>
+              <div className="absolute top-20 right-20 pointer-events-none z-10 opacity-5">
+                <Lock className="w-32 h-32 text-foreground" />
+              </div>
+              <div className="absolute bottom-20 left-20 pointer-events-none z-10 opacity-5">
+                <Lock className="w-32 h-32 text-foreground" />
+              </div>
+
+              {/* Non-copyable content */}
+              <div
+                className="prose prose-invert max-w-none select-none"
+                style={{
+                  userSelect: "none",
+                  WebkitUserSelect: "none",
+                  MozUserSelect: "none",
+                  msUserSelect: "none",
+                }}
+                onCopy={(e) => e.preventDefault()}
+                onCut={(e) => e.preventDefault()}
+                onContextMenu={(e) => e.preventDefault()}
+              >
+                <div dangerouslySetInnerHTML={{ __html: sampleContent }} />
+              </div>
+
+              {/* Bottom watermark banner */}
+              <div className="sticky bottom-0 left-0 right-0 bg-primary/20 backdrop-blur-sm border-t border-primary/30 p-3 mt-6 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm text-foreground">
+                    <Lock className="w-4 h-4" />
+                    <span>This is a sample preview. Purchase to generate your customized contract.</span>
+                  </div>
                 </div>
               </div>
             </div>
+
             <div className="flex gap-2 mt-4">
-              <Button variant="outline" className="border-border hover:bg-secondary bg-transparent">
-                <Download className="w-4 h-4 mr-2" />
-                Download Template
+              <Button className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90" asChild>
+                <a href={`/generate/${contract.slug}`}>Fill Out & Generate</a>
               </Button>
             </div>
           </TabsContent>
@@ -176,6 +194,110 @@ export function PDFPreviewModal({ contract, open, onOpenChange }: PDFPreviewModa
       </DialogContent>
     </Dialog>
   )
+}
+
+function getSampleContractContent(slug: string, name: string): string {
+  const sampleContracts: Record<string, string> = {
+    "influencer-agreement": `
+      <h2>${name}</h2>
+      <p><strong>SAMPLE TEMPLATE PREVIEW</strong></p>
+      <hr />
+      
+      <p>This INFLUENCER AGREEMENT (the "Agreement") is entered into as of <strong>[EFFECTIVE_DATE]</strong> by and between:</p>
+      
+      <p><strong>SPONSOR:</strong> <strong>[SPONSOR_NAME]</strong>, a company incorporated in the State of <strong>[SPONSOR_STATE]</strong>, with its principal place of business at <strong>[SPONSOR_ADDRESS]</strong> (the "Sponsor")</p>
+      
+      <p><strong>INFLUENCER:</strong> <strong>[INFLUENCER_NAME]</strong>, residing at <strong>[INFLUENCER_ADDRESS]</strong> (the "Influencer")</p>
+      
+      <h3>1. SPONSORSHIP TERMS</h3>
+      <p>The Sponsor hereby engages the Influencer to promote the following goods: <strong>[GOODS_DESCRIPTION]</strong></p>
+      
+      <p>The Influencer agrees to display and promote such goods through the following social media platforms: <strong>[SOCIAL_PLATFORMS]</strong></p>
+      
+      <h3>2. COMPENSATION</h3>
+      <p>In consideration for the services rendered, Sponsor shall pay Influencer the sum of <strong>[PAYMENT_AMOUNT]</strong> according to the following schedule: <strong>[PAYMENT_SCHEDULE]</strong></p>
+      
+      <h3>3. TERM AND TERMINATION</h3>
+      <p>This Agreement shall commence on the Effective Date and continue until <strong>[TERMINATION_DATE]</strong>, unless earlier terminated as provided herein...</p>
+      
+      <h3>4. FTC COMPLIANCE</h3>
+      <p>Influencer agrees to comply with all Federal Trade Commission (FTC) guidelines regarding disclosure of sponsored content...</p>
+      
+      <h3>5. INTELLECTUAL PROPERTY</h3>
+      <p>Each party retains ownership of their respective intellectual property. Limited licenses are granted for the purposes of this Agreement...</p>
+      
+      <p><em>[Additional terms and conditions continue below...]</em></p>
+    `,
+    "production-agreement": `
+      <h2>${name}</h2>
+      <p><strong>SAMPLE TEMPLATE PREVIEW</strong></p>
+      <hr />
+      
+      <p>This MUSIC PRODUCTION AGREEMENT (the "Agreement") is made and entered into as of <strong>[EFFECTIVE_DATE]</strong>, in the State of <strong>[STATE]</strong>, by and between:</p>
+      
+      <p><strong>PRODUCER:</strong> <strong>[PRODUCER_NAME]</strong>, with an address at <strong>[PRODUCER_ADDRESS]</strong></p>
+      
+      <p><strong>CLIENT:</strong> <strong>[CLIENT_NAME]</strong>, with an address at <strong>[CLIENT_ADDRESS]</strong></p>
+      
+      <h3>1. PRODUCTION SERVICES</h3>
+      <p>Producer agrees to provide the following production services: <strong>[PRODUCTION_SERVICES]</strong></p>
+      
+      <p>Services shall commence on <strong>[COMMENCEMENT_DATE]</strong> and shall meet the following specifications: <strong>[SPECIFICATIONS]</strong></p>
+      
+      <h3>2. COMPENSATION</h3>
+      <p>Client agrees to pay Producer a fixed fee of <strong>[FIXED_FEE]</strong> for the services described herein.</p>
+      
+      <p>Payment shall be made via <strong>[PAYMENT_METHOD]</strong> within <strong>[INVOICE_PERIOD]</strong> of receipt of invoice...</p>
+      
+      <h3>3. INTELLECTUAL PROPERTY RIGHTS</h3>
+      <p>All work created under this Agreement shall be considered "work made for hire" and shall be the exclusive property of Client...</p>
+      
+      <h3>4. ROYALTIES</h3>
+      <p>Producer shall be entitled to the following royalties: <strong>[ROYALTIES]</strong></p>
+      
+      <p><em>[Additional terms including credits, termination, and representations continue...]</em></p>
+    `,
+  }
+
+  // Default sample content for contracts not specified above
+  const defaultContent = `
+    <h2>${name}</h2>
+    <p><strong>SAMPLE TEMPLATE PREVIEW</strong></p>
+    <hr />
+    
+    <p>This Agreement (the "Agreement") is entered into as of <strong>[DATE]</strong> by and between the parties identified herein.</p>
+    
+    <h3>PARTIES</h3>
+    <p>This section identifies the contracting parties and their respective roles and contact information...</p>
+    
+    <h3>SCOPE OF SERVICES/WORK</h3>
+    <p>This section outlines the specific services, deliverables, or obligations each party agrees to provide...</p>
+    
+    <h3>COMPENSATION</h3>
+    <p>Details regarding payment terms, amounts, schedules, and any additional financial arrangements...</p>
+    
+    <h3>TERM AND TERMINATION</h3>
+    <p>The duration of this agreement and conditions under which either party may terminate...</p>
+    
+    <h3>INTELLECTUAL PROPERTY</h3>
+    <p>Provisions regarding ownership, usage rights, and licensing of any intellectual property created or used...</p>
+    
+    <h3>CONFIDENTIALITY</h3>
+    <p>Obligations to maintain confidentiality of sensitive information disclosed during the term...</p>
+    
+    <h3>REPRESENTATIONS AND WARRANTIES</h3>
+    <p>Each party's assurances regarding their authority, capabilities, and compliance with applicable laws...</p>
+    
+    <h3>INDEMNIFICATION</h3>
+    <p>Agreement to protect and hold harmless against certain liabilities and claims...</p>
+    
+    <h3>GOVERNING LAW</h3>
+    <p>The jurisdiction and laws that will govern the interpretation and enforcement of this agreement...</p>
+    
+    <p><em>[Additional standard terms and signature blocks follow...]</em></p>
+  `
+
+  return sampleContracts[slug] || defaultContent
 }
 
 function getContractAnalysis(slug: string): { overview: string; sections: ContractSection[] } {

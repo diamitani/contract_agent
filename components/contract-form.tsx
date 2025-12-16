@@ -178,16 +178,17 @@ export function ContractForm({ contract, onSubmit, isSubmitting, showPaymentProm
         <Button
           type="submit"
           disabled={isSubmitting}
-          className={`bg-gradient-to-r from-primary to-amber-500 hover:from-primary/90 hover:to-amber-500/90 text-white font-semibold ${isFullWidth ? "w-full" : ""}`}
+          size="lg"
+          className={`bg-gradient-to-r from-primary to-amber-500 hover:from-primary/90 hover:to-amber-500/90 text-white font-semibold text-base min-h-[48px] ${isFullWidth ? "w-full" : "min-w-[240px]"}`}
         >
           {isSubmitting ? (
             <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
               Processing...
             </>
           ) : (
             <>
-              <CreditCard className="w-4 h-4 mr-2" />
+              <CreditCard className="w-5 h-5 mr-2" />
               Generate Contract - $19.99
             </>
           )}
@@ -199,16 +200,17 @@ export function ContractForm({ contract, onSubmit, isSubmitting, showPaymentProm
       <Button
         type="submit"
         disabled={isSubmitting}
-        className={`bg-primary text-primary-foreground hover:bg-primary/90 ${isFullWidth ? "w-full" : ""}`}
+        size="lg"
+        className={`bg-primary text-primary-foreground hover:bg-primary/90 min-h-[48px] ${isFullWidth ? "w-full" : "min-w-[200px]"}`}
       >
         {isSubmitting ? (
           <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
             Generating...
           </>
         ) : (
           <>
-            <Send className="w-4 h-4 mr-2" />
+            <Send className="w-5 h-5 mr-2" />
             Generate Contract
           </>
         )}

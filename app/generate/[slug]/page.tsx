@@ -116,6 +116,12 @@ export default function GenerateContractPage() {
   }
 
   const handleGenerateClick = async (formData: Record<string, string>) => {
+    if (subscriptionStatus === "unlimited") {
+      // Unlimited subscribers can generate directly
+      await handleSubmit(formData)
+      return
+    }
+
     // Save form data to localStorage
     localStorage.setItem(
       FORM_DATA_STORAGE_KEY,
@@ -126,7 +132,7 @@ export default function GenerateContractPage() {
       }),
     )
 
-    // Check if user can generate
+    // Check if user can generate (has credits)
     if (!canGenerate) {
       // Show payment modal with plan options
       setPendingFormDataForPayment(formData)
@@ -134,7 +140,7 @@ export default function GenerateContractPage() {
       return
     }
 
-    // User can generate - proceed
+    // User has credits - proceed
     await handleSubmit(formData)
   }
 

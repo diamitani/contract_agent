@@ -137,7 +137,12 @@ function CheckoutCompleteContent() {
 
       // If session exists (email confirmation disabled), redirect appropriately
       if (data.session) {
-        if (contractSlug && returnToGenerate) {
+        // Check product type from session data
+        if (sessionData?.productType === "unlimited") {
+          // Subscription users go to dashboard
+          router.push("/dashboard")
+        } else if (contractSlug && returnToGenerate) {
+          // One-time payment users go to generate their contract
           router.push(`/generate/${contractSlug}?from_payment=true`)
         } else {
           setStatus("success")
