@@ -47,13 +47,16 @@ export function PDFPreviewModal({ contract, open, onOpenChange }: PDFPreviewModa
     setExpandedSections(newExpanded)
   }
 
+  console.log("[v0] PDFPreviewModal render", { contractName: contract?.name, open })
+
   if (!contract) return null
 
   const sampleContent = getSampleContractContent(contract.slug, contract.name)
+  console.log("[v0] Sample content generated", { slug: contract.slug, contentLength: sampleContent.length })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl h-[80vh] bg-card border-border">
+      <DialogContent className="max-w-4xl max-h-[90vh] bg-card border-border flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-foreground flex items-center gap-2">
             <FileText className="w-5 h-5 text-primary" />
@@ -64,7 +67,7 @@ export function PDFPreviewModal({ contract, open, onOpenChange }: PDFPreviewModa
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="preview" className="flex-1 flex flex-col">
+        <Tabs defaultValue="preview" className="flex-1 flex flex-col overflow-hidden">
           <TabsList className="bg-secondary">
             <TabsTrigger
               value="preview"
@@ -80,47 +83,49 @@ export function PDFPreviewModal({ contract, open, onOpenChange }: PDFPreviewModa
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="preview" className="flex-1 mt-4">
-            <div className="relative bg-secondary/50 rounded-lg p-6 h-[50vh] overflow-auto">
-              {/* Watermark overlays */}
-              <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center opacity-10">
-                <div className="text-6xl font-bold text-foreground rotate-[-45deg] select-none">SAMPLE PREVIEW</div>
-              </div>
-              <div className="absolute top-20 right-20 pointer-events-none z-10 opacity-5">
-                <Lock className="w-32 h-32 text-foreground" />
-              </div>
-              <div className="absolute bottom-20 left-20 pointer-events-none z-10 opacity-5">
-                <Lock className="w-32 h-32 text-foreground" />
-              </div>
+          <TabsContent value="preview" className="flex-1 mt-4 overflow-hidden flex flex-col">
+            <ScrollArea className="flex-1">
+              <div className="relative bg-secondary/50 rounded-lg p-6">
+                {/* Watermark overlays */}
+                <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center opacity-10">
+                  <div className="text-6xl font-bold text-foreground rotate-[-45deg] select-none">SAMPLE PREVIEW</div>
+                </div>
+                <div className="absolute top-20 right-20 pointer-events-none z-10 opacity-5">
+                  <Lock className="w-32 h-32 text-foreground" />
+                </div>
+                <div className="absolute bottom-20 left-20 pointer-events-none z-10 opacity-5">
+                  <Lock className="w-32 h-32 text-foreground" />
+                </div>
 
-              {/* Non-copyable content */}
-              <div
-                className="prose prose-invert max-w-none select-none"
-                style={{
-                  userSelect: "none",
-                  WebkitUserSelect: "none",
-                  MozUserSelect: "none",
-                  msUserSelect: "none",
-                }}
-                onCopy={(e) => e.preventDefault()}
-                onCut={(e) => e.preventDefault()}
-                onContextMenu={(e) => e.preventDefault()}
-              >
-                <div dangerouslySetInnerHTML={{ __html: sampleContent }} />
-              </div>
+                {/* Non-copyable content */}
+                <div
+                  className="prose prose-invert max-w-none select-none"
+                  style={{
+                    userSelect: "none",
+                    WebkitUserSelect: "none",
+                    MozUserSelect: "none",
+                    msUserSelect: "none",
+                  }}
+                  onCopy={(e) => e.preventDefault()}
+                  onCut={(e) => e.preventDefault()}
+                  onContextMenu={(e) => e.preventDefault()}
+                >
+                  <div dangerouslySetInnerHTML={{ __html: sampleContent }} />
+                </div>
 
-              {/* Bottom watermark banner */}
-              <div className="sticky bottom-0 left-0 right-0 bg-primary/20 backdrop-blur-sm border-t border-primary/30 p-3 mt-6 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm text-foreground">
-                    <Lock className="w-4 h-4" />
-                    <span>This is a sample preview. Purchase to generate your customized contract.</span>
+                {/* Bottom watermark banner */}
+                <div className="sticky bottom-0 left-0 right-0 bg-primary/20 backdrop-blur-sm border-t border-primary/30 p-3 mt-6 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm text-foreground">
+                      <Lock className="w-4 h-4" />
+                      <span>This is a sample preview. Purchase to generate your customized contract.</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </ScrollArea>
 
-            <div className="flex gap-2 mt-4">
+            <div className="flex gap-2 mt-4 flex-shrink-0">
               <Button className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90" asChild>
                 <a href={`/generate/${contract.slug}`}>Fill Out & Generate</a>
               </Button>
