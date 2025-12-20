@@ -84,7 +84,7 @@ export function PDFPreviewModal({ contract, open, onOpenChange }: PDFPreviewModa
           </TabsList>
 
           <TabsContent value="preview" className="flex-1 mt-4 overflow-hidden flex flex-col">
-            <ScrollArea className="flex-1">
+            <ScrollArea className="h-[calc(70vh-12rem)]">
               <div className="relative bg-secondary/50 rounded-lg p-6">
                 {/* Watermark overlays */}
                 <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center opacity-10">

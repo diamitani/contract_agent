@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { Eye } from "lucide-react"
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -17,9 +18,16 @@ interface ContractFormProps {
   onSubmit: (data: Record<string, string>) => Promise<void>
   isSubmitting: boolean
   showPaymentPrompt?: boolean
+  onPreviewClick?: () => void
 }
 
-export function ContractForm({ contract, onSubmit, isSubmitting, showPaymentPrompt = false }: ContractFormProps) {
+export function ContractForm({
+  contract,
+  onSubmit,
+  isSubmitting,
+  showPaymentPrompt = false,
+  onPreviewClick,
+}: ContractFormProps) {
   const [formData, setFormData] = useState<Record<string, string>>({})
   const [currentStep, setCurrentStep] = useState(0)
   const [mode, setMode] = useState<"form" | "chat">("form")
@@ -173,49 +181,62 @@ export function ContractForm({ contract, onSubmit, isSubmitting, showPaymentProm
   }
 
   const renderGenerateButton = (isFullWidth = false) => {
-    if (showPaymentPrompt) {
-      return (
+    const buttonGroup = (
+      <div className={`flex gap-2 ${isFullWidth ? "w-full" : ""}`}>
         <Button
-          type="submit"
-          disabled={isSubmitting}
+          type="button"
+          variant="outline"
+          onClick={onPreviewClick}
           size="lg"
-          className={`bg-gradient-to-r from-primary to-amber-500 hover:from-primary/90 hover:to-amber-500/90 text-white font-semibold text-base min-h-[48px] ${isFullWidth ? "w-full" : "min-w-[240px]"}`}
+          className="border-border hover:bg-secondary bg-transparent min-h-[48px] px-6"
         >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              Processing...
-            </>
-          ) : (
-            <>
-              <CreditCard className="w-5 h-5 mr-2" />
-              Generate Contract - $19.99
-            </>
-          )}
+          <Eye className="w-5 h-5 mr-2" />
+          Preview
         </Button>
-      )
-    }
 
-    return (
-      <Button
-        type="submit"
-        disabled={isSubmitting}
-        size="lg"
-        className={`bg-primary text-primary-foreground hover:bg-primary/90 min-h-[48px] ${isFullWidth ? "w-full" : "min-w-[200px]"}`}
-      >
-        {isSubmitting ? (
-          <>
-            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-            Generating...
-          </>
+        {showPaymentPrompt ? (
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            size="lg"
+            className={`bg-gradient-to-r from-primary to-amber-500 hover:from-primary/90 hover:to-amber-500/90 text-white font-semibold text-base min-h-[48px] flex-1`}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <CreditCard className="w-5 h-5 mr-2" />
+                Generate Contract - $19.99
+              </>
+            )}
+          </Button>
         ) : (
-          <>
-            <Send className="w-5 h-5 mr-2" />
-            Generate Contract
-          </>
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            size="lg"
+            className={`bg-primary text-primary-foreground hover:bg-primary/90 min-h-[48px] flex-1`}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Send className="w-5 h-5 mr-2" />
+                Generate Contract
+              </>
+            )}
+          </Button>
         )}
-      </Button>
+      </div>
     )
+
+    return buttonGroup
   }
 
   return (

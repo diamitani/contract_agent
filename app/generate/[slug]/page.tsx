@@ -419,6 +419,7 @@ export default function GenerateContractPage() {
                   onSubmit={handleGenerateClick}
                   isSubmitting={isSubmitting}
                   showPaymentPrompt={!canGenerate}
+                  onPreviewClick={() => setPreviewOpen(true)}
                 />
               </>
             )}
