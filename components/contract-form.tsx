@@ -107,6 +107,11 @@ export function ContractForm({
     }
   }
 
+  const handlePreview = () => {
+    const dataString = encodeURIComponent(JSON.stringify(formData))
+    window.open(`/preview/${contract.slug}?data=${dataString}`, "_blank")
+  }
+
   const renderField = (field: ContractField) => {
     const value = formData[field.id] || ""
 
@@ -186,7 +191,7 @@ export function ContractForm({
         <Button
           type="button"
           variant="outline"
-          onClick={onPreviewClick}
+          onClick={handlePreview}
           size="lg"
           className="border-border hover:bg-secondary bg-transparent min-h-[48px] px-6"
         >

@@ -1463,3 +1463,5 @@ export function getContractsByCategory(category: string): ContractTemplate[] {
 export function getAllCategories(): string[] {
   return [...new Set(contractTemplates.map((contract) => contract.category))]
 }
+
+export const contracts = contractTemplates
