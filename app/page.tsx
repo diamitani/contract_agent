@@ -24,7 +24,23 @@ import {
   Star,
 } from "lucide-react"
 import Link from "next/link"
+import { motion } from "framer-motion"
 import type { ContractTemplate } from "@/lib/contracts"
+
+const fadeIn = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
+}
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+}
 
 export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -52,38 +68,63 @@ export default function HomePage() {
       <Header />
 
       {/* Hero Section */}
-      <section className="border-b border-border bg-gradient-to-b from-primary/5 to-transparent">
+      <section className="border-b border-border bg-gradient-to-b from-primary/5 to-transparent overflow-hidden">
         <div className="container mx-auto px-4 py-16 md:py-24 text-center">
-          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full mb-6">
+          <motion.div 
+            initial="hidden"
+            animate="visible"
+            variants={fadeIn}
+            className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full mb-6"
+          >
             <Sparkles className="w-4 h-4" />
             <span className="text-sm font-medium">AI-Powered Contract Generation</span>
-          </div>
-          <h1 className="text-4xl md:text-6xl font-bold text-foreground mb-6 text-balance">
+          </motion.div>
+          <motion.h1 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="text-4xl md:text-6xl lg:text-7xl font-bold text-foreground mb-6 text-balance tracking-tight"
+          >
             Professional Contracts for the
-            <span className="text-primary"> Music Industry</span>
-          </h1>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto mb-8 text-pretty">
+            <span className="text-primary block mt-2"> Music Industry</span>
+          </motion.h1>
+          <motion.p 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto mb-8 text-pretty"
+          >
             Generate legally structured agreements in minutes. From recording deals to management contracts, protect
             your music business with AI-powered documentation.
-          </p>
+          </motion.p>
 
-          <div className="flex flex-wrap justify-center gap-4 mb-12">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            className="flex flex-wrap justify-center gap-4 mb-12"
+          >
             <Link href="#contracts">
-              <Button size="lg" className="bg-primary hover:bg-primary/90">
-                Generate Contract <Sparkles className="w-4 h-4 ml-2" />
+              <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground group transition-all duration-300 transform shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:-translate-y-1">
+                Generate Contract <Sparkles className="w-4 h-4 ml-2 group-hover:scale-125 transition-transform" />
               </Button>
             </Link>
             <Link href="/templates">
-              <Button size="lg" variant="outline">
-                Free Templates <Download className="w-4 h-4 ml-2" />
+              <Button size="lg" variant="outline" className="group transition-all duration-300 hover:bg-accent hover:text-accent-foreground hover:border-accent hover:-translate-y-1">
+                Free Templates <Download className="w-4 h-4 ml-2 group-hover:-translate-y-1 transition-transform" />
               </Button>
             </Link>
-          </div>
+          </motion.div>
 
           {/* Trust Indicators */}
-          <div className="flex flex-wrap justify-center gap-8 md:gap-12 pt-8 border-t border-border/50">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1, delay: 0.5 }}
+            className="flex flex-wrap justify-center gap-8 md:gap-12 pt-8 border-t border-border/50"
+          >
+            <div className="flex items-center gap-3 group cursor-default">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
                 <FileText className="w-5 h-5 text-primary" />
               </div>
               <div className="text-left">
@@ -91,8 +132,8 @@ export default function HomePage() {
                 <p className="text-sm text-muted-foreground">Industry-standard</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
+            <div className="flex items-center gap-3 group cursor-default">
+              <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center group-hover:bg-accent/20 transition-colors">
                 <Zap className="w-5 h-5 text-accent" />
               </div>
               <div className="text-left">
@@ -100,8 +141,8 @@ export default function HomePage() {
                 <p className="text-sm text-muted-foreground">AI-powered speed</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-chart-5/10 flex items-center justify-center">
+            <div className="flex items-center gap-3 group cursor-default">
+              <div className="w-10 h-10 rounded-lg bg-chart-5/10 flex items-center justify-center group-hover:bg-chart-5/20 transition-colors">
                 <Shield className="w-5 h-5 text-chart-5" />
               </div>
               <div className="text-left">
@@ -109,20 +150,32 @@ export default function HomePage() {
                 <p className="text-sm text-muted-foreground">Professional language</p>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* How It Works - Quick Overview */}
-      <section className="container mx-auto px-4 py-16">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">How It Works</h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+      <section className="container mx-auto px-4 py-20 md:py-32">
+        <motion.div 
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-100px" }}
+          variants={fadeIn}
+          className="text-center mb-16"
+        >
+          <h2 className="text-3xl md:text-5xl font-bold text-foreground mb-4">How It Works</h2>
+          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
             Create professional contracts in four simple steps
           </p>
-        </div>
+        </motion.div>
 
-        <div className="grid md:grid-cols-4 gap-6 mb-12">
+        <motion.div 
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-100px" }}
+          variants={staggerContainer}
+          className="grid md:grid-cols-4 gap-6 mb-12"
+        >
           {[
             {
               step: "01",
@@ -149,37 +202,50 @@ export default function HomePage() {
               description: "Export as PDF and send for signatures",
             },
           ].map((item, index) => (
-            <div key={index} className="relative">
-              <div className="bg-card border border-border rounded-xl p-6 h-full text-center">
-                <div className="text-4xl font-bold text-primary/20 mb-3">{item.step}</div>
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                  <item.icon className="w-6 h-6 text-primary" />
+            <motion.div variants={fadeIn} key={index} className="relative group perspective-1000">
+              <div className="bg-card/50 backdrop-blur-sm border border-border/40 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/5 rounded-2xl p-8 h-full text-center transition-all duration-500 ease-out transform group-hover:-translate-y-2">
+                <div className="text-5xl font-black text-primary/10 mb-6 group-hover:scale-110 transition-transform duration-500">{item.step}</div>
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-500">
+                  <item.icon className="w-8 h-8 text-primary" />
                 </div>
-                <h3 className="font-semibold text-foreground mb-1">{item.title}</h3>
-                <p className="text-sm text-muted-foreground">{item.description}</p>
+                <h3 className="text-xl font-bold text-foreground mb-3">{item.title}</h3>
+                <p className="text-base text-muted-foreground">{item.description}</p>
               </div>
               {index < 3 && (
-                <div className="hidden md:block absolute top-1/2 -right-3 transform -translate-y-1/2 z-10">
-                  <ArrowRight className="w-6 h-6 text-muted-foreground" />
+                <div className="hidden md:block absolute top-1/2 -right-4 transform -translate-y-1/2 z-10 text-muted-foreground/30">
+                  <ArrowRight className="w-8 h-8" />
                 </div>
               )}
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       </section>
 
       {/* Contract Generation Section */}
-      <section id="contracts" className="border-y border-border bg-secondary/30">
-        <div className="container mx-auto px-4 py-16">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">Generate Your Contract</h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+      <section id="contracts" className="border-y border-border bg-secondary/30 relative">
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent opacity-50 pointer-events-none" />
+        <div className="container mx-auto px-4 py-20 md:py-32 relative z-10">
+          <motion.div 
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-100px" }}
+            variants={fadeIn}
+            className="text-center mb-12"
+          >
+            <h2 className="text-3xl md:text-5xl font-bold text-foreground mb-4">Generate Your Contract</h2>
+            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
               Select a template to start generating your AI-powered contract
             </p>
-          </div>
+          </motion.div>
 
           {/* Search and Filters */}
-          <div className="flex flex-col gap-4 mb-8 max-w-3xl mx-auto">
+          <motion.div 
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-100px" }}
+            variants={fadeIn}
+            className="flex flex-col gap-4 mb-12 max-w-3xl mx-auto"
+          >
             <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
               <Input
@@ -216,14 +282,22 @@ export default function HomePage() {
                 </Badge>
               ))}
             </div>
-          </div>
+          </motion.div>
 
           {/* Contract Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <motion.div 
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-100px" }}
+            variants={staggerContainer}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+          >
             {filteredContracts.map((contract) => (
-              <ContractCard key={contract.id} contract={contract} onPreview={() => handlePreview(contract)} />
+              <motion.div variants={fadeIn} key={contract.id}>
+                <ContractCard contract={contract} onPreview={() => handlePreview(contract)} />
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
 
           {filteredContracts.length === 0 && (
             <div className="text-center py-12">
@@ -236,16 +310,29 @@ export default function HomePage() {
       </section>
 
       {/* Features Grid */}
-      <section className="container mx-auto px-4 py-16">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">Everything You Need</h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+      <section className="container mx-auto px-4 py-20 md:py-32">
+        <motion.div 
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-100px" }}
+          variants={fadeIn}
+          className="text-center mb-16"
+        >
+          <h2 className="text-3xl md:text-5xl font-bold text-foreground mb-4">Everything You Need</h2>
+          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
             Complete contract management for music professionals
           </p>
-        </div>
+        </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-8">
-          <Card className="bg-card border-border hover:border-primary/50 transition-colors">
+        <motion.div 
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-100px" }}
+          variants={staggerContainer}
+          className="grid md:grid-cols-3 gap-8"
+        >
+          <motion.div variants={fadeIn} className="h-full">
+            <Card className="bg-card/50 backdrop-blur-sm border-border/40 hover:border-primary/50 transition-all duration-300 hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1 h-full flex flex-col">
             <CardHeader>
               <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
                 <Sparkles className="w-7 h-7 text-primary" />
@@ -269,9 +356,11 @@ export default function HomePage() {
                 </li>
               </ul>
             </CardContent>
-          </Card>
+            </Card>
+          </motion.div>
 
-          <Card className="bg-card border-border hover:border-accent/50 transition-colors">
+          <motion.div variants={fadeIn} className="h-full">
+            <Card className="bg-card/50 backdrop-blur-sm border-border/40 hover:border-accent/50 transition-all duration-300 hover:shadow-xl hover:shadow-accent/5 hover:-translate-y-1 h-full flex flex-col">
             <CardHeader>
               <div className="w-14 h-14 rounded-xl bg-accent/10 flex items-center justify-center mb-4">
                 <Brain className="w-7 h-7 text-accent" />
@@ -295,9 +384,11 @@ export default function HomePage() {
                 </li>
               </ul>
             </CardContent>
-          </Card>
+            </Card>
+          </motion.div>
 
-          <Card className="bg-card border-border hover:border-chart-5/50 transition-colors">
+          <motion.div variants={fadeIn} className="h-full">
+            <Card className="bg-card/50 backdrop-blur-sm border-border/40 hover:border-chart-5/50 transition-all duration-300 hover:shadow-xl hover:shadow-chart-5/5 hover:-translate-y-1 h-full flex flex-col">
             <CardHeader>
               <div className="w-14 h-14 rounded-xl bg-chart-5/10 flex items-center justify-center mb-4">
                 <Download className="w-7 h-7 text-chart-5" />
@@ -329,21 +420,37 @@ export default function HomePage() {
                 </Button>
               </Link>
             </CardContent>
-          </Card>
-        </div>
+            </Card>
+          </motion.div>
+        </motion.div>
       </section>
 
       {/* Why Choose Us */}
-      <section className="border-y border-border bg-secondary/30">
-        <div className="container mx-auto px-4 py-16">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">Why Music Professionals Choose Us</h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+      <section className="border-y border-border bg-gradient-to-b from-secondary/30 to-background overflow-hidden relative">
+        <div className="absolute -left-40 -top-40 w-96 h-96 bg-primary/10 rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute -right-40 -bottom-40 w-96 h-96 bg-accent/10 rounded-full blur-[100px] pointer-events-none" />
+        
+        <div className="container mx-auto px-4 py-20 md:py-32 relative z-10">
+          <motion.div 
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-100px" }}
+            variants={fadeIn}
+            className="text-center mb-16"
+          >
+            <h2 className="text-3xl md:text-5xl font-bold text-foreground mb-4">Why Music Professionals Choose Us</h2>
+            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
               Built specifically for the music industry by people who understand it
             </p>
-          </div>
+          </motion.div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <motion.div 
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-100px" }}
+            variants={staggerContainer}
+            className="grid md:grid-cols-3 gap-12"
+          >
             {[
               {
                 icon: Zap,
@@ -364,15 +471,15 @@ export default function HomePage() {
                   "Skip expensive lawyer consultations for standard agreements. Professional contracts at a fraction of the cost.",
               },
             ].map((item, index) => (
-              <div key={index} className="text-center">
-                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
-                  <item.icon className="w-8 h-8 text-primary" />
+              <motion.div variants={fadeIn} key={index} className="text-center group">
+                <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/10 flex items-center justify-center mx-auto mb-8 group-hover:scale-110 group-hover:-rotate-3 transition-all duration-500 shadow-lg shadow-primary/5">
+                  <item.icon className="w-10 h-10 text-primary" />
                 </div>
-                <h3 className="text-xl font-semibold text-foreground mb-3">{item.title}</h3>
-                <p className="text-muted-foreground">{item.description}</p>
-              </div>
+                <h3 className="text-2xl font-bold text-foreground mb-4">{item.title}</h3>
+                <p className="text-lg text-muted-foreground leading-relaxed">{item.description}</p>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
@@ -419,23 +526,30 @@ export default function HomePage() {
 
       {/* CTA Section */}
       <section className="border-t border-border bg-primary/5">
-        <div className="container mx-auto px-4 py-16 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-6">Ready to Protect Your Music Business?</h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
-            Join thousands of artists, producers, and music professionals who trust Artispreneur.
-          </p>
-          <div className="flex flex-wrap justify-center gap-4">
-            <Link href="#contracts">
-              <Button size="lg" className="bg-primary hover:bg-primary/90">
-                Generate a Contract <Sparkles className="w-4 h-4 ml-2" />
-              </Button>
-            </Link>
-            <Link href="/pricing">
-              <Button size="lg" variant="outline">
-                View Pricing <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </Link>
-          </div>
+        <div className="container mx-auto px-4 py-24 text-center">
+          <motion.div 
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-100px" }}
+            variants={fadeIn}
+          >
+            <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6">Ready to Protect Your Music Business?</h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
+              Join thousands of artists, producers, and music professionals who trust Artispreneur.
+            </p>
+            <div className="flex flex-wrap justify-center gap-4">
+              <Link href="#contracts">
+                <Button size="lg" className="h-14 px-8 text-lg bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:-translate-y-1 transition-all duration-300">
+                  Generate a Contract <Sparkles className="w-5 h-5 ml-2" />
+                </Button>
+              </Link>
+              <Link href="/pricing">
+                <Button size="lg" variant="outline" className="h-14 px-8 text-lg hover:bg-accent hover:text-accent-foreground hover:border-accent hover:-translate-y-1 transition-all duration-300">
+                  View Pricing <ArrowRight className="w-5 h-5 ml-2" />
+                </Button>
+              </Link>
+            </div>
+          </motion.div>
         </div>
       </section>
 
