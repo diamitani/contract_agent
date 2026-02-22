@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
       .eq("user_id", user.id)
       .maybeSingle()
 
-    if (profile?.subscription_status !== "active") {
+    if (profile?.subscription_status !== "unlimited") {
       return NextResponse.json(
         {
           error: "AI Contract Analysis requires an Unlimited Contracts subscription",

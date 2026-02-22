@@ -1,4 +1,3 @@
-
 import { Suspense } from "react"
 import { notFound } from "next/navigation"
 import { contracts } from "@/lib/contracts"

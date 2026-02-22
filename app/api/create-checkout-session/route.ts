@@ -61,8 +61,6 @@ export async function POST(request: NextRequest) {
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.headers.get("origin") || "http://localhost:3000"
 
-    const returnGenerateParam = contractSlug ? "&return_generate=true" : ""
-
     // Validate coupon if provided
     let validatedCoupon: string | undefined
     if (couponCode) {

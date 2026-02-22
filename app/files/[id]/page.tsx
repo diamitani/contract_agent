@@ -113,7 +113,7 @@ export default function FileViewerPage() {
         .eq("user_id", user.id)
         .maybeSingle()
 
-      setHasSubscription(profile?.subscription_status === "active")
+      setHasSubscription(profile?.subscription_status === "unlimited")
       setCheckingSubscription(false)
 
       const { data: fileData, error: fileError } = await supabase

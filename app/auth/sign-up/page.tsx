@@ -12,6 +12,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useState, Suspense } from "react"
 import { FileText, Shield, Zap, PenTool, CheckCircle2 } from "lucide-react"
 import { APP_ID } from "@/lib/constants"
+import { OAuthButtons } from "@/components/auth/oauth-buttons"
 
 const features = [
   {
@@ -47,6 +48,11 @@ function SignUpForm() {
 
   const plan = searchParams.get("plan")
   const contractSlug = searchParams.get("contract")
+
+  const oauthRedirectPath =
+    plan && (plan === "per_contract" || plan === "unlimited")
+      ? `/checkout/${plan}${contractSlug ? `?contract=${contractSlug}` : ""}`
+      : "/dashboard"
 
   const handleEmailSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -124,6 +130,10 @@ function SignUpForm() {
           </p>
         </div>
       )}
+
+      <div className="mb-5">
+        <OAuthButtons redirectPath={oauthRedirectPath} mode="signup" />
+      </div>
 
       <form onSubmit={handleEmailSignUp} className="space-y-5">
         <div className="space-y-2">

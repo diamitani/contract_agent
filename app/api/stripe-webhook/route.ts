@@ -1,24 +1,23 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
-import { stripe } from "@/lib/stripe"
 import type Stripe from "stripe"
 import { APP_ID } from "@/lib/constants"
+import { stripe } from "@/lib/stripe"
 
 // Use service role for webhook handler
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
-
 export async function POST(request: NextRequest) {
   const body = await request.text()
   const signature = request.headers.get("stripe-signature")
-
-  let event: Stripe.Event
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
 
   if (!signature || !webhookSecret) {
     console.error("Missing signature or webhook secret")
     return NextResponse.json({ error: "Missing signature or webhook secret" }, { status: 400 })
   }
+
+  let event: Stripe.Event
 
   try {
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
@@ -43,7 +42,7 @@ export async function POST(request: NextRequest) {
           .update({
             status: "completed",
             stripe_payment_id: session.payment_intent as string,
-            app_id: appId, // Track which app processed the payment
+            app_id: appId,
           })
           .eq("stripe_session_id", session.id)
 
@@ -58,7 +57,6 @@ export async function POST(request: NextRequest) {
             })
             .eq("user_id", userId)
         } else if (productType === "per_contract") {
-          // Add one contract credit
           const { data: profile } = await supabaseAdmin
             .from("user_profiles")
             .select("contracts_remaining")
@@ -81,7 +79,6 @@ export async function POST(request: NextRequest) {
         const subscription = event.data.object as Stripe.Subscription
         const customerId = subscription.customer as string
 
-        // Find user by Stripe customer ID
         const { data: profile } = await supabaseAdmin
           .from("user_profiles")
           .select("user_id")
@@ -112,7 +109,6 @@ export async function POST(request: NextRequest) {
           .single()
 
         if (profile) {
-          // Could send email notification here
           console.log("Payment failed for user:", profile.user_id)
         }
         break

@@ -11,6 +11,7 @@ import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useState, Suspense } from "react"
 import { FileText, Shield, Zap, PenTool, CheckCircle2 } from "lucide-react"
+import { OAuthButtons } from "@/components/auth/oauth-buttons"
 
 const features = [
   {
@@ -46,6 +47,11 @@ function SignInForm() {
   const redirectTo = searchParams.get("redirect")
   const plan = searchParams.get("plan")
   const contractSlug = searchParams.get("contract")
+
+  const oauthRedirectPath =
+    plan && (plan === "per_contract" || plan === "unlimited")
+      ? `/checkout/${plan}${contractSlug ? `?contract=${contractSlug}` : ""}`
+      : redirectTo || "/dashboard"
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -104,6 +110,10 @@ function SignInForm() {
           </p>
         </div>
       )}
+
+      <div className="mb-5">
+        <OAuthButtons redirectPath={oauthRedirectPath} mode="signin" />
+      </div>
 
       <form onSubmit={handleEmailLogin} className="space-y-5">
         <div className="space-y-2">
