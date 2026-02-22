@@ -1,12 +1,8 @@
 import Stripe from "stripe"
 
-export const stripe = new Stripe(
-  process.env.STRIPE_SECRET_KEY ||
-    "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",
-  {
-    apiVersion: "2025-05-28.basil",
-  },
-)
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2025-11-17.clover" as any,
+})
 
 export const PRODUCTS = {
   per_contract: {
