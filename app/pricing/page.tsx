@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Check, Sparkles, FileText, Zap, Crown, Loader2, ArrowRight, Shield, Clock, Users } from "lucide-react"
-import { createBrowserClient } from "@supabase/ssr"
+import { createBrowserClient } from "@/lib/supabase/client"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
@@ -97,10 +97,7 @@ function PricingContent() {
   const [user, setUser] = useState<any>(null)
   const [subscription, setSubscription] = useState<any>(null)
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  )
+  const supabase = createBrowserClient()
 
   useEffect(() => {
     const checkUser = async () => {

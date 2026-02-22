@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, FileText, Eye, Info, Lock, Zap, Crown, Loader2, Check } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
-import { createBrowserClient } from "@supabase/ssr"
+import { createBrowserClient } from "@/lib/supabase/client"
 
 const FORM_DATA_STORAGE_KEY = "contract_form_data"
 
@@ -45,10 +45,7 @@ export default function GenerateContractPage() {
   const [pendingFormData, setPendingFormData] = useState<Record<string, string> | null>(null)
   const [autoGenerating, setAutoGenerating] = useState(false)
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  )
+  const supabase = createBrowserClient()
 
   useEffect(() => {
     const checkAccess = async () => {
