@@ -1,8 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { generateText } from "ai"
 import JSZip from "jszip"
+import { getCurrentUser } from "@/lib/auth/current-user"
+import { getUploadedFileById, getUserProfile, updateUploadedFile } from "@/lib/cosmos/store"
 
 const getGeminiClient = () => {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY
@@ -88,21 +89,14 @@ export async function POST(request: NextRequest) {
   try {
     const { fileId, storagePath } = await request.json()
 
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const user = await getCurrentUser()
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     // Check subscription
-    const { data: profile } = await supabase
-      .from("user_profiles")
-      .select("subscription_status")
-      .eq("user_id", user.id)
-      .maybeSingle()
+    const profile = await getUserProfile(user.id)
 
     if (profile?.subscription_status !== "unlimited") {
       return NextResponse.json(
@@ -115,18 +109,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Get file info
-    const { data: fileInfo } = await supabase
-      .from("uploaded_files")
-      .select("file_name, file_type, extracted_text")
-      .eq("id", fileId)
-      .single()
+    const fileInfo = await getUploadedFileById(user.id, fileId)
+    if (!fileInfo) {
+      return NextResponse.json({ error: "File not found" }, { status: 404 })
+    }
 
     // Update status
-    await supabase
-      .from("uploaded_files")
-      .update({ analysis_status: "analyzing" })
-      .eq("id", fileId)
-      .eq("user_id", user.id)
+    await updateUploadedFile(user.id, fileId, { analysis_status: "analyzing" })
 
     // Extract text from document
     let extractedText = fileInfo?.extracted_text || ""
@@ -262,15 +251,11 @@ IMPORTANT:
     }
 
     // Save results
-    await supabase
-      .from("uploaded_files")
-      .update({
-        analysis_status: "completed",
-        analysis_result: analysis,
-        extracted_text: extractedText.slice(0, 50000),
-      })
-      .eq("id", fileId)
-      .eq("user_id", user.id)
+    await updateUploadedFile(user.id, fileId, {
+      analysis_status: "completed",
+      analysis_result: analysis,
+      extracted_text: extractedText.slice(0, 50000),
+    })
 
     return NextResponse.json({ analysis, model: "gemini" })
   } catch (error) {

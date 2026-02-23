@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Upload, FileText, X, Loader2 } from "lucide-react"
 import { saveUploadedFile, type UploadedFile } from "@/lib/contract-store"
-import { createClient } from "@/lib/supabase/client"
 
 interface ContractUploadProps {
   onUpload: (file: UploadedFile) => void
@@ -53,35 +52,8 @@ export function ContractUpload({ onUpload }: ContractUploadProps) {
     setUploadStatus("Uploading file...")
 
     try {
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (!user) {
-        throw new Error("You must be signed in to upload files")
-      }
-
-      // Create a unique file path
       const fileExt = selectedFile.name.split(".").pop()
-      const fileName = `${user.id}/${Date.now()}-${selectedFile.name}`
-
-      // Upload to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("contract-files")
-        .upload(fileName, selectedFile)
-
-      let fileUrl = ""
-
-      if (uploadError) {
-        console.warn("Storage upload failed, using blob URL:", uploadError)
-        fileUrl = URL.createObjectURL(selectedFile)
-      } else {
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from("contract-files").getPublicUrl(fileName)
-        fileUrl = publicUrl
-      }
+      const fileUrl = URL.createObjectURL(selectedFile)
 
       setUploadStatus("Processing document with AI...")
 

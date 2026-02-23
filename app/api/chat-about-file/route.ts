@@ -1,26 +1,20 @@
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
 import { generateChat } from "@/lib/ai"
+import { getCurrentUser } from "@/lib/auth/current-user"
+import { getUserProfile } from "@/lib/cosmos/store"
 
 export async function POST(request: NextRequest) {
   try {
     const { fileId, message, context, history, analysis } = await request.json()
 
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const user = await getCurrentUser()
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: profile } = await supabase
-      .from("user_profiles")
-      .select("subscription_status")
-      .eq("user_id", user.id)
-      .maybeSingle()
+    const profile = await getUserProfile(user.id)
 
     if (profile?.subscription_status !== "unlimited") {
       return NextResponse.json(

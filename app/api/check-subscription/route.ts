@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { ensureUserProfile, isCosmosConfigured } from "@/lib/cosmos/store"
+import { getCurrentUser } from "@/lib/auth/current-user"
 
 export async function GET() {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const user = await getCurrentUser()
 
     if (!user) {
       return NextResponse.json({
@@ -16,29 +14,15 @@ export async function GET() {
       })
     }
 
-    const { data: profile, error } = await supabase
-      .from("user_profiles")
-      .select("subscription_status, contracts_remaining, contracts_generated")
-      .eq("user_id", user.id)
-      .maybeSingle()
-
-    if (error) {
-      console.error("Error fetching profile:", error)
-    }
-
-    if (!profile) {
-      // Create profile if it doesn't exist
-      await supabase.from("user_profiles").insert({
-        user_id: user.id,
-        email: user.email,
-      })
-
+    if (!isCosmosConfigured()) {
       return NextResponse.json({
         canGenerate: false,
         status: "free",
         contractsRemaining: 0,
       })
     }
+
+    const profile = await ensureUserProfile(user)
 
     // Only paying users can generate
     const canGenerate =

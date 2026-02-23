@@ -1,15 +1,21 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { stripe, PRODUCTS, type ProductType, type Stripe } from "@/lib/stripe"
-import { createClient } from "@/lib/supabase/server"
+import type Stripe from "stripe"
+import { getStripe, isStripeConfigured, PRODUCTS, type ProductType } from "@/lib/stripe"
 import { APP_ID } from "@/lib/constants"
+import { getCurrentUser } from "@/lib/auth/current-user"
+import { ensureUserProfile, isCosmosConfigured, upsertPayment, upsertUserProfile } from "@/lib/cosmos/store"
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    if (!isStripeConfigured()) {
+      return NextResponse.json({ error: "Stripe is not configured" }, { status: 503 })
+    }
 
+    if (!isCosmosConfigured()) {
+      return NextResponse.json({ error: "Cosmos DB is not configured" }, { status: 500 })
+    }
+
+    const user = await getCurrentUser()
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
@@ -25,19 +31,14 @@ export async function POST(request: NextRequest) {
     }
 
     const product = PRODUCTS[productType]
+    const stripe = getStripe()
 
-    const { data: profile } = await supabase
-      .from("user_profiles")
-      .select("stripe_customer_id")
-      .eq("user_id", user.id)
-      .maybeSingle()
-
-    let customerId = profile?.stripe_customer_id
+    const profile = await ensureUserProfile(user)
+    let customerId = profile?.stripe_customer_id || null
 
     if (!customerId) {
-      // Create Stripe customer
       const customer = await stripe.customers.create({
-        email: user.email,
+        email: user.email || undefined,
         metadata: {
           user_id: user.id,
           app_id: APP_ID,
@@ -45,24 +46,17 @@ export async function POST(request: NextRequest) {
       })
       customerId = customer.id
 
-      const { error: upsertError } = await supabase.from("user_profiles").upsert(
-        {
-          user_id: user.id,
-          email: user.email,
-          stripe_customer_id: customerId,
-        },
-        { onConflict: "user_id" },
-      )
-
-      if (upsertError) {
-        console.error("Failed to upsert user profile:", upsertError)
-        // Continue anyway - Stripe customer was created
-      }
+      await upsertUserProfile(user.id, {
+        email: user.email || null,
+        full_name: user.name || null,
+        stripe_customer_id: customerId,
+        registered_app_id: APP_ID,
+        platform: APP_ID,
+      })
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.headers.get("origin") || "http://localhost:3000"
 
-    // Create checkout session
     const sessionConfig: Stripe.Checkout.SessionCreateParams = {
       customer: customerId,
       payment_method_types: ["card"],
@@ -99,16 +93,16 @@ export async function POST(request: NextRequest) {
     const session = await stripe.checkout.sessions.create(sessionConfig)
 
     try {
-      await supabase.from("payments").insert({
+      await upsertPayment({
         user_id: user.id,
         stripe_session_id: session.id,
         amount: product.price,
         product_type: productType,
         status: "pending",
+        app_id: APP_ID,
       })
     } catch (paymentError) {
       console.error("Failed to record payment:", paymentError)
-      // Continue anyway - checkout session was created
     }
 
     return NextResponse.json({ url: session.url })

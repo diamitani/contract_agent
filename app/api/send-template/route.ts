@@ -1,37 +1,38 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
-import { createClient } from "@supabase/supabase-js"
+import { addAnalyticsEvent, isCosmosConfigured } from "@/lib/cosmos/store"
+import { APP_ID } from "@/lib/constants"
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+const MAKE_WEBHOOK_URL = process.env.TEMPLATE_MAKE_WEBHOOK_URL || "https://hook.us2.make.com/laid4qandumq6ahbce23zfxs820qupg0"
 
-// Initialize Supabase with service role for backend operations
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
-
-const MAKE_WEBHOOK_URL = "https://hook.us2.make.com/laid4qandumq6ahbce23zfxs820qupg0"
+function getResendClient() {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) return null
+  return new Resend(apiKey)
+}
 
 export async function POST(request: NextRequest) {
   try {
     const { name, email, contractSlug, contractName } = await request.json()
 
     const timestamp = new Date().toISOString()
-    const appId = "contract_agent"
+    const appId = APP_ID
 
-    // 1. Store submission in Supabase
-    const { data: dbRecord, error: dbError } = await supabase
-      .from("template_downloads")
-      .insert({
-        name,
-        email,
-        contract_name: contractName,
-        contract_slug: contractSlug,
-        app_id: appId,
-        downloaded_at: timestamp,
-      })
-      .select()
-      .single()
-
-    if (dbError) {
-      console.error("Supabase error:", dbError)
+    // 1. Store event in Cosmos when configured
+    if (isCosmosConfigured()) {
+      try {
+        const analyticsUser = String(email || "guest").toLowerCase()
+        await addAnalyticsEvent(analyticsUser, "template_download", {
+          name,
+          email,
+          contract_slug: contractSlug,
+          contract_name: contractName,
+          downloaded_at: timestamp,
+          app_id: appId,
+        })
+      } catch (error) {
+        console.error("Failed to log template download event:", error)
+      }
     }
 
     // 2. Send webhook to make.com
@@ -60,12 +61,17 @@ export async function POST(request: NextRequest) {
 
     // 3. Send email via Resend
     let emailSent = false
+    const resend = getResendClient()
+
     try {
-      const { data: emailData, error: emailError } = await resend.emails.send({
-        from: "Artispreneur <pat@artispreneur.com>",
-        to: email,
-        subject: `Your ${contractName} Template - Artispreneur`,
-        html: `
+      if (!resend) {
+        console.warn("RESEND_API_KEY is not configured; skipping template email send")
+      } else {
+        const { data: emailData, error: emailError } = await resend.emails.send({
+          from: "Artispreneur <pat@artispreneur.com>",
+          to: email,
+          subject: `Your ${contractName} Template - Artispreneur`,
+          html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -143,24 +149,34 @@ export async function POST(request: NextRequest) {
 </body>
 </html>
         `,
-      })
+        })
 
-      if (emailError) {
-        console.error("Resend error:", emailError)
-      } else {
-        emailSent = true
-        console.log("Email sent successfully:", emailData)
+        if (emailError) {
+          console.error("Resend error:", emailError)
+        } else {
+          emailSent = true
+          console.log("Email sent successfully:", emailData)
+        }
       }
     } catch (emailErr) {
       console.error("Email sending error:", emailErr)
     }
 
-    // 4. Update record with email/webhook status
-    if (dbRecord?.id) {
-      await supabase
-        .from("template_downloads")
-        .update({ email_sent: emailSent, webhook_sent: webhookSent })
-        .eq("id", dbRecord.id)
+    // 4. Record post-processing status in Cosmos
+    if (isCosmosConfigured()) {
+      try {
+        const analyticsUser = String(email || "guest").toLowerCase()
+        await addAnalyticsEvent(analyticsUser, "template_download_delivery", {
+          contract_slug: contractSlug,
+          contract_name: contractName,
+          email_sent: emailSent,
+          webhook_sent: webhookSent,
+          app_id: appId,
+          processed_at: new Date().toISOString(),
+        })
+      } catch (error) {
+        console.error("Failed to log template delivery event:", error)
+      }
     }
 
     return NextResponse.json({

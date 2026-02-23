@@ -4,7 +4,6 @@ import Link from "next/link"
 import Image from "next/image"
 import { Sparkles, LayoutDashboard, Home, LogOut, User, FileText, CreditCard, Menu } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -15,35 +14,17 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet"
-import { useEffect, useState } from "react"
-import type { User as SupabaseUser } from "@supabase/supabase-js"
+import { useState } from "react"
+import { useAuthUser } from "@/hooks/use-auth-user"
 
 export function Header() {
   const pathname = usePathname()
   const router = useRouter()
-  const [user, setUser] = useState<SupabaseUser | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { user, loading, signOut } = useAuthUser()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-  useEffect(() => {
-    const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user)
-      setLoading(false)
-    })
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-    })
-
-    return () => subscription.unsubscribe()
-  }, [])
-
   const handleSignOut = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
+    await signOut()
     setMobileMenuOpen(false)
     router.push("/")
   }
@@ -106,11 +87,11 @@ export function Header() {
                     <Button variant="ghost" className="relative h-9 w-9 rounded-full">
                       <Avatar className="h-9 w-9">
                         <AvatarImage
-                          src={user.user_metadata?.avatar_url || "/placeholder.svg"}
-                          alt={user.email || ""}
+                          src="/placeholder.svg"
+                          alt={user.email || user.name || ""}
                         />
                         <AvatarFallback className="bg-primary text-primary-foreground">
-                          {getInitials(user.email || "U")}
+                          {getInitials(user.email || user.name || "U")}
                         </AvatarFallback>
                       </Avatar>
                     </Button>
@@ -118,8 +99,8 @@ export function Header() {
                   <DropdownMenuContent className="w-56" align="end">
                     <div className="flex items-center justify-start gap-2 p-2">
                       <div className="flex flex-col space-y-1 leading-none">
-                        {user.user_metadata?.full_name && (
-                          <p className="font-medium text-sm">{user.user_metadata.full_name}</p>
+                        {user.name && (
+                          <p className="font-medium text-sm">{user.name}</p>
                         )}
                         <p className="text-xs text-muted-foreground">{user.email}</p>
                       </div>
@@ -165,9 +146,9 @@ export function Header() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-9 w-9 rounded-full">
                   <Avatar className="h-9 w-9">
-                    <AvatarImage src={user.user_metadata?.avatar_url || "/placeholder.svg"} alt={user.email || ""} />
+                    <AvatarImage src="/placeholder.svg" alt={user.email || user.name || ""} />
                     <AvatarFallback className="bg-primary text-primary-foreground">
-                      {getInitials(user.email || "U")}
+                      {getInitials(user.email || user.name || "U")}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
@@ -175,8 +156,8 @@ export function Header() {
               <DropdownMenuContent className="w-56" align="end">
                 <div className="flex items-center justify-start gap-2 p-2">
                   <div className="flex flex-col space-y-1 leading-none">
-                    {user.user_metadata?.full_name && (
-                      <p className="font-medium text-sm">{user.user_metadata.full_name}</p>
+                    {user.name && (
+                      <p className="font-medium text-sm">{user.name}</p>
                     )}
                     <p className="text-xs text-muted-foreground">{user.email}</p>
                   </div>

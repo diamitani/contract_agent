@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Check, Sparkles, FileText, Zap, Crown, Loader2, ArrowRight, Shield, Clock, Users } from "lucide-react"
-import { createBrowserClient } from "@/lib/supabase/client"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { useAuthUser } from "@/hooks/use-auth-user"
 
 const plans = [
   {
@@ -93,27 +93,26 @@ const faqs = [
 
 function PricingContent() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const [user, setUser] = useState<any>(null)
+  const { user } = useAuthUser()
   const [subscription, setSubscription] = useState<any>(null)
 
-  const supabase = createBrowserClient()
-
   useEffect(() => {
-    const checkUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      setUser(user)
-
-      if (user) {
-        const res = await fetch("/api/check-subscription")
-        const data = await res.json()
-        setSubscription(data)
+    const checkSubscription = async () => {
+      if (!user) {
+        setSubscription(null)
+        return
       }
+
+      const res = await fetch("/api/check-subscription")
+      const data = await res.json()
+      setSubscription(data)
     }
-    checkUser()
-  }, [supabase.auth])
+
+    checkSubscription().catch((error) => {
+      console.error("Failed to load subscription:", error)
+      setSubscription(null)
+    })
+  }, [user?.id])
 
   const handlePurchase = (productType: "per_contract" | "unlimited") => {
     if (productType === "per_contract") {

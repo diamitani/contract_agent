@@ -1,31 +1,18 @@
 import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
 import { DashboardClient } from "@/components/dashboard-client"
+import { getCurrentUser } from "@/lib/auth/current-user"
+import { isCosmosConfigured, listContracts, listUploadedFiles } from "@/lib/cosmos/store"
 
 export default async function DashboardPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
-  if (error || !user) {
+  if (!user) {
     redirect("/auth/sign-in")
   }
 
-  // Fetch contracts from Supabase
-  const { data: contracts } = await supabase
-    .from("contracts")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-
-  // Fetch uploaded files from Supabase
-  const { data: uploadedFiles } = await supabase
-    .from("uploaded_files")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
+  const [contracts, uploadedFiles] = isCosmosConfigured()
+    ? await Promise.all([listContracts(user.id), listUploadedFiles(user.id)])
+    : [[], []]
 
   return <DashboardClient initialContracts={contracts || []} initialUploadedFiles={uploadedFiles || []} user={user} />
 }

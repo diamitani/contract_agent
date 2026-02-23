@@ -2,13 +2,10 @@
 
 import type React from "react"
 
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import Image from "next/image"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { useState, Suspense } from "react"
 import { FileText, Shield, Zap, PenTool, CheckCircle2 } from "lucide-react"
 import { OAuthButtons } from "@/components/auth/oauth-buttons"
@@ -37,11 +34,7 @@ const features = [
 ]
 
 function SignInForm() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
   const searchParams = useSearchParams()
 
   const redirectTo = searchParams.get("redirect")
@@ -55,29 +48,9 @@ function SignInForm() {
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    const supabase = createClient()
     setIsLoading(true)
-    setError(null)
-
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-      if (error) throw error
-
-      if (plan && (plan === "per_contract" || plan === "unlimited")) {
-        router.push(`/checkout/${plan}${contractSlug ? `?contract=${contractSlug}` : ""}`)
-      } else if (redirectTo) {
-        router.push(redirectTo)
-      } else {
-        router.push("/dashboard")
-      }
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred")
-    } finally {
-      setIsLoading(false)
-    }
+    const next = encodeURIComponent(oauthRedirectPath)
+    window.location.href = `/api/auth/azure/login?next=${next}`
   }
 
   return (
@@ -115,48 +88,12 @@ function SignInForm() {
         <OAuthButtons redirectPath={oauthRedirectPath} mode="signin" />
       </div>
 
-      <form onSubmit={handleEmailLogin} className="space-y-5">
-        <div className="space-y-2">
-          <Label htmlFor="email" className="text-sm font-medium">
-            Email address
-          </Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="h-12 bg-input border-border text-base"
-          />
+      <form onSubmit={handleEmailLogin} className="space-y-4">
+        <div className="rounded-lg border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
+          Sign-in is managed with Microsoft Azure Active Directory.
         </div>
-
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="password" className="text-sm font-medium">
-              Password
-            </Label>
-            <Link href="/auth/forgot-password" className="text-sm text-primary hover:underline">
-              Forgot password?
-            </Link>
-          </div>
-          <Input
-            id="password"
-            type="password"
-            placeholder="Enter your password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="h-12 bg-input border-border text-base"
-          />
-        </div>
-
-        {error && (
-          <div className="text-sm text-destructive bg-destructive/10 p-4 rounded-lg border border-destructive/20">
-            {error}
-          </div>
-        )}
-
         <Button type="submit" className="w-full h-12 text-base font-semibold" disabled={isLoading}>
-          {isLoading ? "Signing in..." : plan ? "Sign in & Continue to Payment" : "Sign in"}
+          {isLoading ? "Redirecting..." : plan ? "Continue to Microsoft Sign-in" : "Sign in with Microsoft"}
         </Button>
       </form>
 

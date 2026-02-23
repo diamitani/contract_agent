@@ -1,14 +1,25 @@
 import Stripe from "stripe"
 
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY
+let stripeClient: Stripe | null = null
 
-if (!stripeSecretKey) {
-  throw new Error("Missing STRIPE_SECRET_KEY environment variable")
+export function isStripeConfigured() {
+  return Boolean(process.env.STRIPE_SECRET_KEY)
 }
 
-export const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: "2025-11-17.clover" as any,
-})
+export function getStripe() {
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY
+  if (!stripeSecretKey) {
+    throw new Error("Missing STRIPE_SECRET_KEY environment variable")
+  }
+
+  if (!stripeClient) {
+    stripeClient = new Stripe(stripeSecretKey, {
+      apiVersion: "2025-11-17.clover" as any,
+    })
+  }
+
+  return stripeClient
+}
 
 export const PRODUCTS = {
   per_contract: {

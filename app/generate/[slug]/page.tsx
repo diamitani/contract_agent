@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, FileText, Eye, Info, Lock, Zap, Crown, Loader2, Check } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
-import { createBrowserClient } from "@/lib/supabase/client"
+import { useAuthUser } from "@/hooks/use-auth-user"
 
 const FORM_DATA_STORAGE_KEY = "contract_form_data"
 
@@ -44,17 +44,13 @@ export default function GenerateContractPage() {
 
   const [pendingFormData, setPendingFormData] = useState<Record<string, string> | null>(null)
   const [autoGenerating, setAutoGenerating] = useState(false)
-
-  const supabase = createBrowserClient()
+  const { user: authUser } = useAuthUser()
 
   useEffect(() => {
     const checkAccess = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      setIsLoggedIn(!!user)
+      setIsLoggedIn(Boolean(authUser))
 
-      if (user) {
+      if (authUser) {
         try {
           const res = await fetch("/api/check-subscription")
           const data = await res.json()
@@ -84,8 +80,11 @@ export default function GenerateContractPage() {
       setCheckingSubscription(false)
     }
 
-    checkAccess()
-  }, [supabase.auth, searchParams, slug])
+    checkAccess().catch((error) => {
+      console.error("Failed to check access:", error)
+      setCheckingSubscription(false)
+    })
+  }, [authUser?.id, searchParams, slug])
 
   useEffect(() => {
     if (pendingFormData && canGenerate && !autoGenerating) {

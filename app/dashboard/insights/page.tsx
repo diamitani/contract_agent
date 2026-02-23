@@ -1,4 +1,3 @@
-import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -15,34 +14,38 @@ import {
   FolderOpen,
   Sparkles,
 } from "lucide-react"
+import { getCurrentUser } from "@/lib/auth/current-user"
+import { isCosmosConfigured, listAnalyticsEvents, listContracts, listUploadedFiles } from "@/lib/cosmos/store"
 
 export default async function InsightsPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   if (!user) {
     redirect("/auth/sign-in")
   }
 
-  // Fetch analytics data
-  const [contractsResult, uploadsResult, eventsResult] = await Promise.all([
-    supabase.from("contracts").select("*").eq("user_id", user.id),
-    supabase.from("uploaded_files").select("*").eq("user_id", user.id),
-    supabase
-      .from("analytics_events")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(20),
+  if (!isCosmosConfigured()) {
+    return (
+      <div className="min-h-screen bg-background">
+        <DashboardHeader />
+        <div className="container mx-auto px-4 py-8">
+          <Card>
+            <CardHeader>
+              <CardTitle>Cosmos DB Not Configured</CardTitle>
+              <CardDescription>Set AZURE_COSMOS_ENDPOINT and AZURE_COSMOS_KEY to load analytics.</CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
+  const [contracts, uploads, events] = await Promise.all([
+    listContracts(user.id),
+    listUploadedFiles(user.id),
+    listAnalyticsEvents(user.id, 20),
   ])
 
-  const contracts = contractsResult.data || []
-  const uploads = uploadsResult.data || []
-  const events = eventsResult.data || []
-
-  // Calculate stats
   const contractsByType: Record<string, number> = {}
   contracts.forEach((c) => {
     contractsByType[c.contract_type] = (contractsByType[c.contract_type] || 0) + 1
@@ -50,7 +53,6 @@ export default async function InsightsPage() {
 
   const analyzedFiles = uploads.filter((u) => u.analysis_status === "completed").length
 
-  // Get contracts by month (last 6 months)
   const now = new Date()
   const monthlyData: Record<string, number> = {}
   for (let i = 5; i >= 0; i--) {
@@ -86,7 +88,6 @@ export default async function InsightsPage() {
           </div>
         </div>
 
-        {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardContent className="pt-6">
@@ -169,7 +170,6 @@ export default async function InsightsPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Monthly Activity */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -190,10 +190,7 @@ export default async function InsightsPage() {
                         <span className="font-medium text-foreground">{count}</span>
                       </div>
                       <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-primary rounded-full transition-all duration-500"
-                          style={{ width: `${percentage}%` }}
-                        />
+                        <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${percentage}%` }} />
                       </div>
                     </div>
                   )
@@ -202,7 +199,6 @@ export default async function InsightsPage() {
             </CardContent>
           </Card>
 
-          {/* Top Contract Types */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -236,7 +232,6 @@ export default async function InsightsPage() {
             </CardContent>
           </Card>
 
-          {/* Recent Activity */}
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -249,15 +244,12 @@ export default async function InsightsPage() {
               {events.length > 0 ? (
                 <div className="space-y-4">
                   {events.slice(0, 10).map((event, index) => (
-                    <div
-                      key={event.id || index}
-                      className="flex items-center gap-4 pb-4 border-b border-border last:border-0"
-                    >
+                    <div key={event.id || index} className="flex items-center gap-4 pb-4 border-b border-border last:border-0">
                       <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
                         {event.event_type === "contract_created" && <FileText className="w-5 h-5 text-primary" />}
                         {event.event_type === "file_uploaded" && <Upload className="w-5 h-5 text-accent" />}
                         {event.event_type === "file_analyzed" && <Sparkles className="w-5 h-5 text-green-500" />}
-                        {!["contract_created", "file_uploaded", "file_analyzed"].includes(event.event_type) && (
+                        {!(["contract_created", "file_uploaded", "file_analyzed"] as string[]).includes(event.event_type) && (
                           <Activity className="w-5 h-5 text-muted-foreground" />
                         )}
                       </div>

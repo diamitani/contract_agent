@@ -1,13 +1,25 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
 import type Stripe from "stripe"
 import { APP_ID } from "@/lib/constants"
-import { stripe } from "@/lib/stripe"
-
-// Use service role for webhook handler
-const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+import { getStripe, isStripeConfigured } from "@/lib/stripe"
+import {
+  findPaymentBySessionId,
+  findUserProfileByStripeCustomerId,
+  getUserProfile,
+  isCosmosConfigured,
+  upsertPayment,
+  upsertUserProfile,
+} from "@/lib/cosmos/store"
 
 export async function POST(request: NextRequest) {
+  if (!isStripeConfigured()) {
+    return NextResponse.json({ error: "Stripe is not configured" }, { status: 503 })
+  }
+
+  if (!isCosmosConfigured()) {
+    return NextResponse.json({ error: "Cosmos DB is not configured" }, { status: 500 })
+  }
+
   const body = await request.text()
   const signature = request.headers.get("stripe-signature")
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
@@ -20,6 +32,7 @@ export async function POST(request: NextRequest) {
   let event: Stripe.Event
 
   try {
+    const stripe = getStripe()
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
   } catch (err) {
     console.error("Webhook signature verification failed:", err)
@@ -37,40 +50,37 @@ export async function POST(request: NextRequest) {
         if (!userId) break
 
         // Update payment status
-        await supabaseAdmin
-          .from("payments")
-          .update({
-            status: "completed",
-            stripe_payment_id: session.payment_intent as string,
-            app_id: appId,
-          })
-          .eq("stripe_session_id", session.id)
+        const existingPayment = await findPaymentBySessionId(session.id)
+        await upsertPayment({
+          id: existingPayment?.id,
+          user_id: userId,
+          stripe_session_id: session.id,
+          stripe_payment_id: typeof session.payment_intent === "string" ? session.payment_intent : null,
+          amount: existingPayment?.amount || session.amount_total || 0,
+          product_type: (productType as string) || existingPayment?.product_type || "per_contract",
+          status: "completed",
+          app_id: appId,
+          created_at: existingPayment?.created_at,
+        })
 
         // Update user profile based on product type
         if (productType === "unlimited") {
-          await supabaseAdmin
-            .from("user_profiles")
-            .update({
-              subscription_status: "unlimited",
-              subscription_id: session.subscription as string,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("user_id", userId)
+          await upsertUserProfile(userId, {
+            subscription_status: "unlimited",
+            subscription_id: typeof session.subscription === "string" ? session.subscription : null,
+            stripe_customer_id: typeof session.customer === "string" ? session.customer : null,
+            email: session.customer_details?.email || null,
+            platform: APP_ID,
+          })
         } else if (productType === "per_contract") {
-          const { data: profile } = await supabaseAdmin
-            .from("user_profiles")
-            .select("contracts_remaining")
-            .eq("user_id", userId)
-            .single()
-
-          await supabaseAdmin
-            .from("user_profiles")
-            .update({
-              subscription_status: "per_contract",
-              contracts_remaining: (profile?.contracts_remaining || 0) + 1,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("user_id", userId)
+          const profile = await getUserProfile(userId)
+          await upsertUserProfile(userId, {
+            subscription_status: "per_contract",
+            contracts_remaining: (profile?.contracts_remaining || 0) + 1,
+            stripe_customer_id: typeof session.customer === "string" ? session.customer : null,
+            email: session.customer_details?.email || null,
+            platform: APP_ID,
+          })
         }
         break
       }
@@ -79,21 +89,13 @@ export async function POST(request: NextRequest) {
         const subscription = event.data.object as Stripe.Subscription
         const customerId = subscription.customer as string
 
-        const { data: profile } = await supabaseAdmin
-          .from("user_profiles")
-          .select("user_id")
-          .eq("stripe_customer_id", customerId)
-          .single()
+        const profile = await findUserProfileByStripeCustomerId(customerId)
 
         if (profile) {
-          await supabaseAdmin
-            .from("user_profiles")
-            .update({
-              subscription_status: "free",
-              subscription_id: null,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("user_id", profile.user_id)
+          await upsertUserProfile(profile.user_id, {
+            subscription_status: "free",
+            subscription_id: null,
+          })
         }
         break
       }
@@ -102,11 +104,7 @@ export async function POST(request: NextRequest) {
         const invoice = event.data.object as Stripe.Invoice
         const customerId = invoice.customer as string
 
-        const { data: profile } = await supabaseAdmin
-          .from("user_profiles")
-          .select("user_id")
-          .eq("stripe_customer_id", customerId)
-          .single()
+        const profile = await findUserProfileByStripeCustomerId(customerId)
 
         if (profile) {
           console.log("Payment failed for user:", profile.user_id)

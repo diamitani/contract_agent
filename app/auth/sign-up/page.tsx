@@ -2,16 +2,12 @@
 
 import type React from "react"
 
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import Image from "next/image"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { useState, Suspense } from "react"
 import { FileText, Shield, Zap, PenTool, CheckCircle2 } from "lucide-react"
-import { APP_ID } from "@/lib/constants"
 import { OAuthButtons } from "@/components/auth/oauth-buttons"
 
 const features = [
@@ -38,12 +34,7 @@ const features = [
 ]
 
 function SignUpForm() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [fullName, setFullName] = useState("")
-  const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
   const searchParams = useSearchParams()
 
   const plan = searchParams.get("plan")
@@ -56,45 +47,9 @@ function SignUpForm() {
 
   const handleEmailSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
-    const supabase = createClient()
     setIsLoading(true)
-    setError(null)
-
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo:
-            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/auth/callback`,
-          data: {
-            full_name: fullName,
-            app_id: APP_ID,
-            platform: APP_ID,
-          },
-        },
-      })
-      if (error) throw error
-
-      if (plan && (plan === "per_contract" || plan === "unlimited")) {
-        // Check if email confirmation is required
-        if (data.user && !data.session) {
-          // Email confirmation required - show success page with info
-          router.push(`/auth/sign-up-success?plan=${plan}${contractSlug ? `&contract=${contractSlug}` : ""}`)
-        } else if (data.session) {
-          // Auto-confirmed - go directly to checkout
-          router.push(`/checkout/${plan}${contractSlug ? `?contract=${contractSlug}` : ""}`)
-        } else {
-          router.push("/auth/sign-up-success")
-        }
-      } else {
-        router.push("/auth/sign-up-success")
-      }
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred")
-    } finally {
-      setIsLoading(false)
-    }
+    const next = encodeURIComponent(oauthRedirectPath)
+    window.location.href = `/api/auth/azure/login?next=${next}`
   }
 
   return (
@@ -136,58 +91,12 @@ function SignUpForm() {
         <OAuthButtons redirectPath={oauthRedirectPath} mode="signup" />
       </div>
 
-      <form onSubmit={handleEmailSignUp} className="space-y-5">
-        <div className="space-y-2">
-          <Label htmlFor="fullName" className="text-sm font-medium">
-            Full name
-          </Label>
-          <Input
-            id="fullName"
-            type="text"
-            placeholder="John Doe"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            className="h-12 bg-input border-border text-base"
-          />
+      <form onSubmit={handleEmailSignUp} className="space-y-4">
+        <div className="rounded-lg border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
+          Account creation is managed with Microsoft Azure Active Directory.
         </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="email" className="text-sm font-medium">
-            Email address
-          </Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="h-12 bg-input border-border text-base"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="password" className="text-sm font-medium">
-            Password
-          </Label>
-          <Input
-            id="password"
-            type="password"
-            placeholder="Min. 6 characters"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="h-12 bg-input border-border text-base"
-          />
-          <p className="text-xs text-muted-foreground">Must be at least 6 characters long</p>
-        </div>
-
-        {error && (
-          <div className="text-sm text-destructive bg-destructive/10 p-4 rounded-lg border border-destructive/20">
-            {error}
-          </div>
-        )}
-
         <Button type="submit" className="w-full h-12 text-base font-semibold" disabled={isLoading}>
-          {isLoading ? "Creating account..." : plan ? "Create Account & Continue" : "Create account"}
+          {isLoading ? "Redirecting..." : plan ? "Continue to Microsoft Sign-up" : "Create account with Microsoft"}
         </Button>
       </form>
 

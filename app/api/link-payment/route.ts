@@ -1,12 +1,19 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-import { stripe } from "@/lib/stripe"
+import { getStripe, isStripeConfigured } from "@/lib/stripe"
 import { APP_ID } from "@/lib/constants"
-
-const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+import { getCurrentUser } from "@/lib/auth/current-user"
+import { findPaymentBySessionId, getUserProfile, isCosmosConfigured, upsertPayment, upsertUserProfile } from "@/lib/cosmos/store"
 
 export async function POST(request: NextRequest) {
   try {
+    if (!isStripeConfigured()) {
+      return NextResponse.json({ error: "Stripe is not configured" }, { status: 503 })
+    }
+
+    if (!isCosmosConfigured()) {
+      return NextResponse.json({ error: "Cosmos DB is not configured" }, { status: 500 })
+    }
+
     const { sessionId, userId } = (await request.json()) as {
       sessionId?: string
       userId?: string
@@ -16,6 +23,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+    if (currentUser.id !== userId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
+    const stripe = getStripe()
     const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId)
 
     if (checkoutSession.status !== "complete" || checkoutSession.payment_status !== "paid") {
@@ -47,33 +63,37 @@ export async function POST(request: NextRequest) {
       profileData.subscription_id = typeof checkoutSession.subscription === "string" ? checkoutSession.subscription : null
     } else if (productType === "per_contract") {
       // Get existing contracts_remaining
-      const { data: existingProfile } = await supabaseAdmin
-        .from("user_profiles")
-        .select("contracts_remaining")
-        .eq("user_id", userId)
-        .maybeSingle()
+      const existingProfile = await getUserProfile(userId)
 
       profileData.subscription_status = "per_contract"
       profileData.contracts_remaining = (existingProfile?.contracts_remaining || 0) + 1
     }
 
-    await supabaseAdmin.from("user_profiles").upsert(profileData, { onConflict: "user_id" })
+    await upsertUserProfile(userId, {
+      stripe_customer_id: customerId,
+      email: (checkoutSession.customer_details?.email || null) as string | null,
+      subscription_status: (profileData.subscription_status as "free" | "per_contract" | "unlimited") || "free",
+      subscription_id: (profileData.subscription_id as string | null | undefined) || null,
+      contracts_remaining: Number(profileData.contracts_remaining || 0),
+      platform: APP_ID,
+      registered_app_id: APP_ID,
+    })
 
     // Record payment if session ID provided
     if (sessionId) {
       try {
-        await supabaseAdmin.from("payments").upsert(
-          {
-            user_id: userId,
-            stripe_session_id: sessionId,
-            stripe_payment_id: typeof checkoutSession.payment_intent === "string" ? checkoutSession.payment_intent : null,
-            amount: checkoutSession.amount_total || 0,
-            product_type: productType,
-            status: "completed",
-            app_id: APP_ID,
-          },
-          { onConflict: "stripe_session_id" },
-        )
+        const existingPayment = await findPaymentBySessionId(sessionId)
+        await upsertPayment({
+          id: existingPayment?.id,
+          user_id: userId,
+          stripe_session_id: sessionId,
+          stripe_payment_id: typeof checkoutSession.payment_intent === "string" ? checkoutSession.payment_intent : null,
+          amount: checkoutSession.amount_total || 0,
+          product_type: productType,
+          status: "completed",
+          app_id: APP_ID,
+          created_at: existingPayment?.created_at,
+        })
       } catch (e) {
         console.error("Failed to record payment:", e)
       }

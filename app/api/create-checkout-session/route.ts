@@ -1,10 +1,17 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { stripe, PRODUCTS, type ProductType } from "@/lib/stripe"
-import { createClient } from "@/lib/supabase/server"
+import { getStripe, isStripeConfigured, PRODUCTS, type ProductType } from "@/lib/stripe"
 import { APP_ID } from "@/lib/constants"
+import { getCurrentUser } from "@/lib/auth/current-user"
+import { ensureUserProfile, isCosmosConfigured, upsertPayment, upsertUserProfile } from "@/lib/cosmos/store"
 
 export async function POST(request: NextRequest) {
   try {
+    if (!isStripeConfigured()) {
+      return NextResponse.json({ error: "Stripe is not configured" }, { status: 503 })
+    }
+
+    const stripe = getStripe()
+
     const { productType, contractSlug, couponCode, guestEmail } = (await request.json()) as {
       productType: ProductType
       contractSlug?: string
@@ -17,30 +24,24 @@ export async function POST(request: NextRequest) {
     }
 
     const product = PRODUCTS[productType]
-    const supabase = await createClient()
+    const user = await getCurrentUser()
 
-    // Check if user is logged in
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    if (user && !isCosmosConfigured()) {
+      return NextResponse.json({ error: "Cosmos DB is not configured" }, { status: 500 })
+    }
 
     let customerId: string | undefined
     let customerEmail: string | undefined = guestEmail
 
     // If logged in, get or create Stripe customer
     if (user) {
-      customerEmail = user.email
-      const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("stripe_customer_id")
-        .eq("user_id", user.id)
-        .maybeSingle()
-
-      customerId = profile?.stripe_customer_id
+      customerEmail = user.email || undefined
+      const profile = await ensureUserProfile(user)
+      customerId = profile?.stripe_customer_id || undefined
 
       if (!customerId) {
         const customer = await stripe.customers.create({
-          email: user.email,
+          email: user.email || undefined,
           metadata: {
             user_id: user.id,
             app_id: APP_ID,
@@ -48,14 +49,13 @@ export async function POST(request: NextRequest) {
         })
         customerId = customer.id
 
-        await supabase.from("user_profiles").upsert(
-          {
-            user_id: user.id,
-            email: user.email,
-            stripe_customer_id: customerId,
-          },
-          { onConflict: "user_id" },
-        )
+        await upsertUserProfile(user.id, {
+          email: user.email || null,
+          full_name: user.name || null,
+          stripe_customer_id: customerId,
+          registered_app_id: APP_ID,
+          platform: APP_ID,
+        })
       }
     }
 
@@ -142,12 +142,13 @@ export async function POST(request: NextRequest) {
     // Record pending payment if user is logged in
     if (user) {
       try {
-        await supabase.from("payments").insert({
+        await upsertPayment({
           user_id: user.id,
           stripe_session_id: session.id,
           amount: product.price,
           product_type: productType,
           status: "pending",
+          app_id: APP_ID,
         })
       } catch (e) {
         console.error("Failed to record payment:", e)

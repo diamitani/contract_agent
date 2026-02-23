@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { createBrowserClient } from "@/lib/supabase/client"
+import { deleteUploadedFile, getFolders, getUploadedFiles, moveFileToFolder, updateUploadedFile } from "@/lib/contract-store"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -97,45 +97,29 @@ export default function FileViewerPage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const supabase = createBrowserClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (!user) {
+      const sessionRes = await fetch("/api/auth/session")
+      const sessionData = await sessionRes.json()
+      if (!sessionData?.user) {
         router.push("/auth/sign-in")
         return
       }
 
-      const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("subscription_status")
-        .eq("user_id", user.id)
-        .maybeSingle()
+      const subscriptionRes = await fetch("/api/check-subscription")
+      const subscriptionData = await subscriptionRes.json()
 
-      setHasSubscription(profile?.subscription_status === "unlimited")
+      setHasSubscription(subscriptionData?.status === "unlimited")
       setCheckingSubscription(false)
 
-      const { data: fileData, error: fileError } = await supabase
-        .from("uploaded_files")
-        .select("*")
-        .eq("id", fileId)
-        .eq("user_id", user.id)
-        .single()
+      const [uploadedFiles, foldersData] = await Promise.all([getUploadedFiles(), getFolders()])
+      const fileData = uploadedFiles.find((entry) => entry.id === fileId)
 
-      if (fileError || !fileData) {
+      if (!fileData) {
         router.push("/dashboard")
         return
       }
 
       setFile(fileData)
       setNewName(fileData.file_name)
-
-      const { data: foldersData } = await supabase
-        .from("folders")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("name", { ascending: true })
 
       setFolders(foldersData || [])
       setLoading(false)
@@ -150,19 +134,9 @@ export default function FileViewerPage() {
 
   const handleRename = async () => {
     if (!file || !newName.trim()) return
-    const supabase = createBrowserClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return
+    const updated = await updateUploadedFile(file.id, { file_name: newName.trim() })
 
-    const { error } = await supabase
-      .from("uploaded_files")
-      .update({ file_name: newName.trim() })
-      .eq("id", file.id)
-      .eq("user_id", user.id)
-
-    if (!error) {
+    if (updated) {
       setFile((prev) => (prev ? { ...prev, file_name: newName.trim() } : null))
       setIsEditing(false)
     }
@@ -170,34 +144,18 @@ export default function FileViewerPage() {
 
   const handleFolderChange = async (folderId: string) => {
     if (!file) return
-    const supabase = createBrowserClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return
 
     const newFolderId = folderId === "none" ? null : folderId
-    const { error } = await supabase
-      .from("uploaded_files")
-      .update({ folder_id: newFolderId })
-      .eq("id", file.id)
-      .eq("user_id", user.id)
-
-    if (!error) {
+    const moved = await moveFileToFolder(file.id, newFolderId)
+    if (moved) {
       setFile((prev) => (prev ? { ...prev, folder_id: newFolderId } : null))
     }
   }
 
   const handleDelete = async () => {
     if (!file) return
-    const supabase = createBrowserClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return
-
-    const { error } = await supabase.from("uploaded_files").delete().eq("id", file.id).eq("user_id", user.id)
-    if (!error) router.push("/dashboard")
+    const deleted = await deleteUploadedFile(file.id)
+    if (deleted) router.push("/dashboard")
   }
 
   const handleAnalyze = async () => {

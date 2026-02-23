@@ -1,33 +1,24 @@
 "use client"
 
-import type React from "react"
-
 import { useEffect, useState, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import { Header } from "@/components/header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { CheckCircle, ArrowRight, FileText, Loader2, PartyPopper, Sparkles, Lock } from "lucide-react"
+import { CheckCircle, ArrowRight, FileText, Loader2, PartyPopper, Sparkles } from "lucide-react"
 import Link from "next/link"
 import confetti from "canvas-confetti"
-import { APP_ID } from "@/lib/constants"
 
 function CheckoutCompleteContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const [status, setStatus] = useState<"loading" | "success" | "needs_account" | "processing" | "error">("loading")
+  const [status, setStatus] = useState<"loading" | "success" | "needs_signin" | "processing" | "error">("loading")
   const [sessionData, setSessionData] = useState<{
     email?: string
     productType?: string
     customerId?: string
   } | null>(null)
-  const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [creatingAccount, setCreatingAccount] = useState(false)
-  const [accountError, setAccountError] = useState<string | null>(null)
+  const [linkingPayment, setLinkingPayment] = useState(false)
 
   const sessionId = searchParams.get("session_id")
   const contractSlug = searchParams.get("contract")
@@ -41,11 +32,14 @@ function CheckoutCompleteContent() {
 
     const checkStatus = async () => {
       try {
-        // First check if user is already logged in
-        const supabase = createClient()
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
+        const sessionResponse = await fetch("/api/auth/session", { cache: "no-store" })
+        const sessionJson = (await sessionResponse.json()) as {
+          user?: {
+            id: string
+            email?: string | null
+          } | null
+        }
+        const user = sessionJson.user || null
 
         const res = await fetch(`/api/checkout-status?session_id=${sessionId}`)
         const data = await res.json()
@@ -58,7 +52,19 @@ function CheckoutCompleteContent() {
           })
 
           if (user) {
-            // User already logged in - go to success
+            setLinkingPayment(true)
+            const linkResponse = await fetch("/api/link-payment", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                sessionId,
+                userId: user.id,
+              }),
+            })
+            if (!linkResponse.ok) {
+              throw new Error("Failed to link payment to account")
+            }
+            setLinkingPayment(false)
             setStatus("success")
             confetti({
               particleCount: 100,
@@ -66,8 +72,7 @@ function CheckoutCompleteContent() {
               origin: { y: 0.6 },
             })
           } else {
-            // Guest checkout - need to create account
-            setStatus("needs_account")
+            setStatus("needs_signin")
             confetti({
               particleCount: 100,
               spread: 70,
@@ -82,6 +87,7 @@ function CheckoutCompleteContent() {
         }
       } catch (e) {
         console.error("Failed to check status:", e)
+        setLinkingPayment(false)
         setStatus("error")
       }
     }
@@ -89,76 +95,12 @@ function CheckoutCompleteContent() {
     setTimeout(checkStatus, 1500)
   }, [sessionId, router])
 
-  const handleCreateAccount = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleMicrosoftSignIn = () => {
+    const currentPath = `/checkout/complete?session_id=${encodeURIComponent(sessionId || "")}${
+      contractSlug ? `&contract=${encodeURIComponent(contractSlug)}` : ""
+    }${returnToGenerate ? "&return_generate=true" : ""}`
 
-    if (password !== confirmPassword) {
-      setAccountError("Passwords do not match")
-      return
-    }
-
-    if (password.length < 6) {
-      setAccountError("Password must be at least 6 characters")
-      return
-    }
-
-    setCreatingAccount(true)
-    setAccountError(null)
-
-    try {
-      const supabase = createClient()
-
-      // Create the account
-      const { data, error } = await supabase.auth.signUp({
-        email: sessionData?.email || "",
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-          data: {
-            stripe_customer_id: sessionData?.customerId,
-            app_id: APP_ID,
-            platform: APP_ID,
-          },
-        },
-      })
-
-      if (error) throw error
-
-      // Link the payment to the new user
-      if (data.user) {
-        await fetch("/api/link-payment", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sessionId,
-            userId: data.user.id,
-            customerId: sessionData?.customerId,
-            productType: sessionData?.productType,
-          }),
-        })
-      }
-
-      // If session exists (email confirmation disabled), redirect appropriately
-      if (data.session) {
-        // Check product type from session data
-        if (sessionData?.productType === "unlimited") {
-          // Subscription users go to dashboard
-          router.push("/dashboard")
-        } else if (contractSlug && returnToGenerate) {
-          // One-time payment users go to generate their contract
-          router.push(`/generate/${contractSlug}?from_payment=true`)
-        } else {
-          setStatus("success")
-        }
-      } else {
-        // Email confirmation required
-        router.push("/auth/sign-up-success")
-      }
-    } catch (error) {
-      setAccountError(error instanceof Error ? error.message : "Failed to create account")
-    } finally {
-      setCreatingAccount(false)
-    }
+    window.location.href = `/api/auth/azure/login?next=${encodeURIComponent(currentPath)}`
   }
 
   if (status === "loading" || status === "processing") {
@@ -170,7 +112,11 @@ function CheckoutCompleteContent() {
             <CardContent className="pt-8 pb-8">
               <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
               <p className="text-lg text-foreground">
-                {status === "processing" ? "Finalizing your purchase..." : "Processing your payment..."}
+                {linkingPayment
+                  ? "Linking payment to your account..."
+                  : status === "processing"
+                    ? "Finalizing your purchase..."
+                    : "Processing your payment..."}
               </p>
               <p className="text-sm text-muted-foreground mt-2">This will only take a moment.</p>
             </CardContent>
@@ -198,7 +144,7 @@ function CheckoutCompleteContent() {
     )
   }
 
-  if (status === "needs_account") {
+  if (status === "needs_signin") {
     return (
       <div className="min-h-screen bg-background">
         <Header />
@@ -216,82 +162,21 @@ function CheckoutCompleteContent() {
                 Payment Successful!
                 <PartyPopper className="w-6 h-6 text-yellow-500 scale-x-[-1]" />
               </h1>
-              <p className="text-muted-foreground mt-2">Now create your account to access your purchase</p>
+              <p className="text-muted-foreground mt-2">Sign in with Microsoft to link this payment to your account</p>
             </div>
 
             <CardContent className="p-6 space-y-6">
               <div className="bg-secondary/50 rounded-lg p-4 text-center">
-                <p className="text-sm text-muted-foreground mb-1">Account email</p>
+                <p className="text-sm text-muted-foreground mb-1">Checkout email</p>
                 <p className="text-foreground font-medium">{sessionData?.email}</p>
               </div>
 
-              <form onSubmit={handleCreateAccount} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-sm font-medium flex items-center gap-2">
-                    <Lock className="w-4 h-4" />
-                    Create a password
-                  </Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="Min. 6 characters"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="h-12 bg-input border-border"
-                    required
-                  />
-                </div>
+              <Button onClick={handleMicrosoftSignIn} className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90">
+                Continue with Microsoft
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
 
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword" className="text-sm font-medium">
-                    Confirm password
-                  </Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    placeholder="Re-enter your password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="h-12 bg-input border-border"
-                    required
-                  />
-                </div>
-
-                {accountError && (
-                  <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-lg border border-destructive/20">
-                    {accountError}
-                  </div>
-                )}
-
-                <Button
-                  type="submit"
-                  className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90"
-                  disabled={creatingAccount}
-                >
-                  {creatingAccount ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Creating Account...
-                    </>
-                  ) : (
-                    <>
-                      Create Account & Continue
-                      <ArrowRight className="w-4 h-4 ml-2" />
-                    </>
-                  )}
-                </Button>
-              </form>
-
-              <p className="text-xs text-center text-muted-foreground">
-                By creating an account, you agree to our{" "}
-                <Link href="/terms" className="underline hover:text-foreground">
-                  Terms
-                </Link>{" "}
-                and{" "}
-                <Link href="/privacy" className="underline hover:text-foreground">
-                  Privacy Policy
-                </Link>
-              </p>
+              <p className="text-xs text-center text-muted-foreground">You will return here automatically after sign-in.</p>
             </CardContent>
           </Card>
         </div>

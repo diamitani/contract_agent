@@ -1,7 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { stripe } from "@/lib/stripe"
+import { getStripe, isStripeConfigured } from "@/lib/stripe"
 
 export async function GET(request: NextRequest) {
+  if (!isStripeConfigured()) {
+    return NextResponse.json({ error: "Stripe is not configured" }, { status: 503 })
+  }
+
   const sessionId = request.nextUrl.searchParams.get("session_id")
 
   if (!sessionId) {
@@ -9,6 +13,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const stripe = getStripe()
     const session = await stripe.checkout.sessions.retrieve(sessionId)
 
     return NextResponse.json({

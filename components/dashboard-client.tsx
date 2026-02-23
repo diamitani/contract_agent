@@ -17,19 +17,21 @@ import { contractTemplates, type ContractTemplate } from "@/lib/contracts"
 import {
   deleteContract,
   deleteUploadedFile,
+  getSavedContracts,
+  getUploadedFiles,
   getFolders,
   type SavedContract,
   type UploadedFile,
   type Folder,
 } from "@/lib/contract-store"
 import { Search, FileText, FolderOpen, Upload, PlusCircle, LayoutDashboard, Crown, Zap } from "lucide-react"
-import type { User } from "@supabase/supabase-js"
+import type { AuthUser } from "@/lib/auth/types"
 import Link from "next/link"
 
 interface DashboardClientProps {
   initialContracts: SavedContract[]
   initialUploadedFiles: UploadedFile[]
-  user: User
+  user: AuthUser
 }
 
 export function DashboardClient({ initialContracts, initialUploadedFiles, user }: DashboardClientProps) {
@@ -44,7 +46,14 @@ export function DashboardClient({ initialContracts, initialUploadedFiles, user }
   const [subscription, setSubscription] = useState<{ status: string; contractsRemaining: number } | null>(null)
 
   useEffect(() => {
-    getFolders().then(setFolders)
+    Promise.all([getSavedContracts(), getUploadedFiles(), getFolders()])
+      .then(([contracts, files, fetchedFolders]) => {
+        setSavedContracts(contracts)
+        setUploadedFiles(files)
+        setFolders(fetchedFolders)
+      })
+      .catch(console.error)
+
     fetch("/api/check-subscription")
       .then((res) => res.json())
       .then((data) => setSubscription(data))
@@ -103,7 +112,7 @@ export function DashboardClient({ initialContracts, initialUploadedFiles, user }
             </div>
             <div>
               <h1 className="text-3xl font-bold text-foreground">
-                Welcome back{user.user_metadata?.full_name ? `, ${user.user_metadata.full_name}` : ""}
+                Welcome back{user.name ? `, ${user.name}` : ""}
               </h1>
               <p className="text-muted-foreground">
                 Manage your contracts, create new ones, and upload documents for review

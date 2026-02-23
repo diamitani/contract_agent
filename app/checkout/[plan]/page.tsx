@@ -4,13 +4,13 @@ import { useEffect, useState, useCallback } from "react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { loadStripe } from "@stripe/stripe-js"
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js"
-import { createClient } from "@/lib/supabase/client"
 import { Header } from "@/components/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Loader2, Shield, Check, ArrowLeft, Tag, CheckCircle, XCircle } from "lucide-react"
 import Link from "next/link"
+import { useAuthUser } from "@/hooks/use-auth-user"
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 
@@ -39,7 +39,7 @@ export default function CheckoutPage() {
   const params = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [user, setUser] = useState<{ id: string; email: string } | null>(null)
+  const { user: authUser } = useAuthUser()
   const [loading, setLoading] = useState(true)
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -53,6 +53,7 @@ export default function CheckoutPage() {
   const contractSlug = searchParams.get("contract")
   const returnToGenerate = searchParams.get("return_generate") === "true"
   const planDetails = PLAN_DETAILS[plan]
+  const user = authUser ? { id: authUser.id, email: authUser.email || "" } : null
 
   const createCheckoutSession = useCallback(
     async (coupon?: string) => {
@@ -85,16 +86,6 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     const init = async () => {
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (user) {
-        setUser({ id: user.id, email: user.email || "" })
-      }
-      // No redirect for guests - proceed to checkout
-
       await createCheckoutSession()
       setLoading(false)
     }
