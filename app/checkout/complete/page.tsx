@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label"
 import { CheckCircle, ArrowRight, FileText, Loader2, PartyPopper, Sparkles, Lock } from "lucide-react"
 import Link from "next/link"
 import confetti from "canvas-confetti"
+import { APP_ID } from "@/lib/constants"
 
 function CheckoutCompleteContent() {
   const searchParams = useSearchParams()
@@ -115,6 +116,7 @@ function CheckoutCompleteContent() {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
             stripe_customer_id: sessionData?.customerId,
+            app_id: APP_ID,
           },
         },
       })
