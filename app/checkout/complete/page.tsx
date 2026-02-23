@@ -117,6 +117,7 @@ function CheckoutCompleteContent() {
           data: {
             stripe_customer_id: sessionData?.customerId,
             app_id: APP_ID,
+            platform: APP_ID,
           },
         },
       })

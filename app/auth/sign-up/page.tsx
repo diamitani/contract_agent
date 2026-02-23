@@ -70,6 +70,7 @@ function SignUpForm() {
           data: {
             full_name: fullName,
             app_id: APP_ID,
+            platform: APP_ID,
           },
         },
       })
