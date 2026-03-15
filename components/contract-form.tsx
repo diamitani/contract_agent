@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress"
 import { ChevronLeft, ChevronRight, Send, Loader2, MessageSquare, FileText, CreditCard, Zap, Crown } from "lucide-react"
 import type { ContractTemplate, ContractField } from "@/lib/contracts"
+import { FieldExplanationTooltip } from "@/components/field-explanation-tooltip"
 
 interface ContractFormProps {
   contract: ContractTemplate
@@ -34,11 +35,12 @@ export function ContractForm({
   const [chatMessages, setChatMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([
     {
       role: "assistant",
-      content: `Hi! I'm here to help you fill out the ${contract.name}. Let's start with the first question: What is the ${contract.fields[0].label.toLowerCase()}? (You can skip any field by typing "skip")`,
+      content: `Hi! I'm your AI contract assistant. I'm here to help you fill out the ${contract.name}. I can answer questions, provide examples, and guide you through each field. What would you like to know, or shall we get started with the first field: ${contract.fields[0].label}?`,
     },
   ])
   const [chatInput, setChatInput] = useState("")
   const [currentChatField, setCurrentChatField] = useState(0)
+  const [isChatLoading, setIsChatLoading] = useState(false)
 
   const fieldsPerStep = 4
   const totalSteps = Math.ceil(contract.fields.length / fieldsPerStep)
@@ -69,32 +71,75 @@ export function ContractForm({
 
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!chatInput.trim()) return
+    if (!chatInput.trim() || isChatLoading) return
 
     const userMessage = chatInput
     setChatInput("")
     setChatMessages((prev) => [...prev, { role: "user", content: userMessage }])
 
-    const currentField = contract.fields[currentChatField]
-    if (userMessage.toLowerCase() !== "skip") {
-      setFormData((prev) => ({ ...prev, [currentField.id]: userMessage }))
-    }
+    setIsChatLoading(true)
 
-    // Move to next field or complete
-    if (currentChatField < contract.fields.length - 1) {
-      const nextField = contract.fields[currentChatField + 1]
-      setTimeout(() => {
+    try {
+      // Call AI chat assistant API
+      const response = await fetch("/api/chat-assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: userMessage,
+          history: chatMessages,
+          contractType: contract.slug,
+          contractName: contract.name,
+          currentField: contract.fields[currentChatField],
+          allFields: contract.fields,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success && data.response) {
+        // Auto-extract field values if the message looks like field data
+        const currentField = contract.fields[currentChatField]
+        if (currentField && userMessage.toLowerCase() !== "skip") {
+          // Simple heuristic: if message is not a question, treat as field value
+          if (!userMessage.includes("?") && !userMessage.startsWith("what") && !userMessage.startsWith("how")) {
+            setFormData((prev) => ({ ...prev, [currentField.id]: userMessage }))
+          }
+        }
+
+        setChatMessages((prev) => [...prev, { role: "assistant", content: data.response }])
+
+        // Check if we should move to next field
+        if (
+          data.response.toLowerCase().includes("next") ||
+          data.response.toLowerCase().includes("moving on") ||
+          data.response.toLowerCase().includes("let's continue")
+        ) {
+          if (currentChatField < contract.fields.length - 1) {
+            setCurrentChatField((prev) => prev + 1)
+          }
+        }
+      } else {
+        throw new Error("Failed to get AI response")
+      }
+    } catch (error) {
+      console.error("Chat error:", error)
+      // Fallback to simple mode
+      const currentField = contract.fields[currentChatField]
+      if (userMessage.toLowerCase() !== "skip") {
+        setFormData((prev) => ({ ...prev, [currentField.id]: userMessage }))
+      }
+
+      if (currentChatField < contract.fields.length - 1) {
+        const nextField = contract.fields[currentChatField + 1]
         setChatMessages((prev) => [
           ...prev,
           {
             role: "assistant",
-            content: `Got it! Now, what is the ${nextField.label.toLowerCase()}?${nextField.description ? ` (${nextField.description})` : ""} (Type "skip" to leave blank)`,
+            content: `Got it! Now, what is the ${nextField.label.toLowerCase()}?${nextField.description ? ` (${nextField.description})` : ""}`,
           },
         ])
         setCurrentChatField((prev) => prev + 1)
-      }, 500)
-    } else {
-      setTimeout(() => {
+      } else {
         setChatMessages((prev) => [
           ...prev,
           {
@@ -103,7 +148,9 @@ export function ContractForm({
               "Perfect! I have all the information needed. Click the 'Generate Contract' button below to create your personalized contract.",
           },
         ])
-      }, 500)
+      }
+    } finally {
+      setIsChatLoading(false)
     }
   }
 
@@ -117,9 +164,17 @@ export function ContractForm({
 
     return (
       <div key={field.id} className="space-y-2">
-        <Label htmlFor={field.id} className="text-foreground flex items-center gap-2">
-          {field.label}
-          <span className="text-muted-foreground text-xs">Optional</span>
+        <Label htmlFor={field.id} className="text-foreground flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            {field.label}
+            <span className="text-muted-foreground text-xs">Optional</span>
+          </span>
+          <FieldExplanationTooltip
+            fieldLabel={field.label}
+            fieldDescription={field.description}
+            contractType={contract.name}
+            fieldName={field.name}
+          />
         </Label>
         {field.description && <p className="text-xs text-muted-foreground">{field.description}</p>}
         {field.type === "textarea" ? (
@@ -369,10 +424,10 @@ export function ContractForm({
               />
               <Button
                 type="submit"
-                disabled={currentChatField >= contract.fields.length || !chatInput.trim()}
+                disabled={currentChatField >= contract.fields.length || !chatInput.trim() || isChatLoading}
                 className="bg-primary text-primary-foreground hover:bg-primary/90"
               >
-                <Send className="w-4 h-4" />
+                {isChatLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               </Button>
             </form>
 

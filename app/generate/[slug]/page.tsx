@@ -430,6 +430,7 @@ export default function GenerateContractPage() {
         generatedContent={generatedContent}
         downloadUrl={downloadUrl}
         isStreaming={isStreaming}
+        isPaid={canGenerate && (subscriptionStatus === "unlimited" || subscriptionStatus === "per_contract")}
       />
 
       <PDFPreviewModal contract={contract} open={previewOpen} onOpenChange={setPreviewOpen} />

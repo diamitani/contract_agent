@@ -1,0 +1,22 @@
+# Claude Cache .gitignore Template
+#
+# Add these lines to your main .gitignore file if you want to keep
+# the cache out of version control
+#
+# Benefits of ignoring:
+# - Keeps repo clean
+# - Cache is regenerated as needed
+# - Prevents cache conflicts between devs
+#
+# Benefits of committing:
+# - Faster onboarding for new devs
+# - Cache available in deployed environments
+# - Team shares same context
+#
+# Recommendation: Ignore it (regenerate as needed)
+
+# Claude cache folder
+.claude_cache/
+
+# Or keep overview but ignore sessions
+.claude_cache/sessions/

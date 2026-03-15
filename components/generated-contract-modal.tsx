@@ -4,9 +4,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Download, Mail, CheckCircle, Copy, FileText, Loader2, Maximize2, Minimize2, X } from "lucide-react"
+import { Download, Mail, CheckCircle, Copy, FileText, Loader2, Maximize2, Minimize2, X, Lock, Crown } from "lucide-react"
 import { useState } from "react"
 import { useToast } from "@/hooks/use-toast"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface GeneratedContractModalProps {
   open: boolean
@@ -15,6 +16,7 @@ interface GeneratedContractModalProps {
   generatedContent: string | null
   downloadUrl: string | null
   isStreaming?: boolean
+  isPaid?: boolean
 }
 
 export function GeneratedContractModal({
@@ -24,6 +26,7 @@ export function GeneratedContractModal({
   generatedContent,
   downloadUrl,
   isStreaming = false,
+  isPaid = true,
 }: GeneratedContractModalProps) {
   const [email, setEmail] = useState("")
   const [sending, setSending] = useState(false)
@@ -60,7 +63,7 @@ export function GeneratedContractModal({
     setGeneratingPdf(true)
 
     try {
-      const response = await fetch("/api/generate-pdf", {
+      const response = await fetch("/api/generate-pdf-watermarked", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -68,6 +71,7 @@ export function GeneratedContractModal({
         body: JSON.stringify({
           content: generatedContent,
           contractName: contractName,
+          watermark: !isPaid,
         }),
       })
 
@@ -76,29 +80,34 @@ export function GeneratedContractModal({
       }
 
       const data = await response.json()
-      const blob = new Blob([data.html], { type: "text/html" })
-      const url = URL.createObjectURL(blob)
-      const printWindow = window.open(url, "_blank")
 
-      if (printWindow) {
-        toast({
-          title: "PDF Ready",
-          description: "Use Print (Ctrl/Cmd + P) and select 'Save as PDF' to download",
-        })
-      } else {
+      if (data.success && data.pdf) {
+        // Convert base64 to blob
+        const byteCharacters = atob(data.pdf)
+        const byteNumbers = new Array(byteCharacters.length)
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i)
+        }
+        const byteArray = new Uint8Array(byteNumbers)
+        const blob = new Blob([byteArray], { type: "application/pdf" })
+
+        // Create download link
+        const url = window.URL.createObjectURL(blob)
         const link = document.createElement("a")
         link.href = url
         link.download = data.filename
         document.body.appendChild(link)
         link.click()
+        window.URL.revokeObjectURL(url)
         document.body.removeChild(link)
+
         toast({
-          title: "Downloaded",
-          description: "Open the HTML file and print to save as PDF",
+          title: isPaid ? "PDF Downloaded" : "Preview PDF Downloaded",
+          description: isPaid
+            ? "Your contract is ready to use"
+            : "This PDF includes watermarks. Purchase to get the official version.",
         })
       }
-
-      URL.revokeObjectURL(url)
     } catch (error) {
       console.error("[v0] PDF generation error:", error)
       toast({
@@ -219,15 +228,32 @@ export function GeneratedContractModal({
               <>
                 <CheckCircle className="w-5 h-5 text-primary" />
                 Contract Generated Successfully
+                {isPaid && <Crown className="w-4 h-4 text-amber-500 ml-2" />}
               </>
             )}
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
             {isStreaming
               ? `Generating your ${contractName}... Please wait.`
-              : `Your ${contractName} has been generated and is ready to download`}
+              : isPaid
+                ? `Your ${contractName} has been generated and is ready to download`
+                : `Your ${contractName} preview has been generated (watermarked)`}
           </DialogDescription>
         </DialogHeader>
+
+        {!isPaid && !isStreaming && (
+          <Card className="flex-shrink-0 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/30">
+            <CardContent className="py-3">
+              <div className="flex items-center gap-3 text-sm">
+                <Lock className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                <span className="text-foreground/90">
+                  PDFs will include watermarks. <strong>Upgrade to $9.99/mo</strong> for unlimited unwatermarked
+                  contracts.
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="flex-1 flex flex-col gap-4 min-h-0 overflow-hidden">
           <div className="flex-1 relative bg-secondary/30 rounded-lg overflow-hidden min-h-0">
