@@ -1,5 +1,6 @@
 import { generateText } from "ai"
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
+import { createOpenAI } from "@ai-sdk/openai"
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || ""
 
@@ -13,7 +14,25 @@ function getGeminiClient() {
   return createGoogleGenerativeAI({ apiKey: key })
 }
 
-export type AIModel = "gemini" | "openai"
+function getAzureOpenAIClient() {
+  const apiKey = process.env.AZURE_OPENAI_API_KEY
+  const endpoint = process.env.AZURE_OPENAI_ENDPOINT
+  const deployment = process.env.AZURE_OPENAI_DEPLOYMENT
+  const apiVersion = process.env.AZURE_OPENAI_API_VERSION || "2024-05-01-preview"
+
+  if (!apiKey || !endpoint || !deployment) {
+    throw new Error("Azure OpenAI credentials not configured")
+  }
+
+  return createOpenAI({
+    apiKey,
+    baseURL: `${endpoint}/openai/deployments/${deployment}`,
+    defaultQuery: { "api-version": apiVersion },
+    defaultHeaders: { "api-key": apiKey },
+  })
+}
+
+export type AIModel = "gemini" | "openai" | "azure-openai"
 
 interface GenerateOptions {
   systemPrompt: string
@@ -28,8 +47,33 @@ export async function generateWithFallback(options: GenerateOptions): Promise<{
 }> {
   const { systemPrompt, userPrompt, maxOutputTokens = 4000, temperature = 0.3 } = options
 
+  // Try Azure OpenAI first if configured
+  if (process.env.AZURE_OPENAI_API_KEY) {
+    try {
+      console.log("[AI] Trying Azure OpenAI")
+      const azure = getAzureOpenAIClient()
+      const result = await generateText({
+        model: azure("gpt-4o"), // Azure deployment name is set in baseURL
+        system: systemPrompt,
+        prompt: userPrompt,
+        maxTokens: maxOutputTokens,
+        temperature,
+      })
+
+      const responseText = result.text || ""
+
+      if (responseText.trim()) {
+        console.log(`[AI] Success with Azure OpenAI, length: ${responseText.length}`)
+        return { text: responseText, model: "azure-openai" }
+      }
+    } catch (error) {
+      console.error("[AI] Azure OpenAI error:", error)
+      // Continue to fallback
+    }
+  }
+
+  // Fallback to Gemini
   const gemini = getGeminiClient()
-  // Try multiple Gemini models
   const models = ["gemini-2.0-flash-exp", "gemini-1.5-flash", "gemini-1.5-pro"]
 
   let lastError: Error | null = null
@@ -66,7 +110,7 @@ export async function generateWithFallback(options: GenerateOptions): Promise<{
     }
   }
 
-  throw lastError || new Error("All Gemini models failed")
+  throw lastError || new Error("All AI models failed")
 }
 
 export async function generateChat(options: {
@@ -77,13 +121,34 @@ export async function generateChat(options: {
 }): Promise<string> {
   const { systemPrompt, messages, maxOutputTokens = 2000, temperature = 0.7 } = options
 
+  const conversationPrompt = messages
+    .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+    .join("\n\n")
+
+  // Try Azure OpenAI first if configured
+  if (process.env.AZURE_OPENAI_API_KEY) {
+    try {
+      console.log("[AI] Trying Azure OpenAI for chat")
+      const azure = getAzureOpenAIClient()
+      const result = await generateText({
+        model: azure("gpt-4o"),
+        system: systemPrompt,
+        prompt: conversationPrompt + "\n\nAssistant:",
+        maxTokens: maxOutputTokens,
+        temperature,
+      })
+
+      return result.text || "I apologize, but I couldn't generate a response. Please try again."
+    } catch (error) {
+      console.error("[AI] Azure OpenAI chat error:", error)
+      // Continue to fallback
+    }
+  }
+
+  // Fallback to Gemini
   const gemini = getGeminiClient()
 
   try {
-    const conversationPrompt = messages
-      .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
-      .join("\n\n")
-
     const result = await generateText({
       model: gemini("gemini-2.0-flash-exp"),
       system: systemPrompt,
@@ -97,11 +162,6 @@ export async function generateChat(options: {
     console.error("[AI] Gemini chat error:", error)
     // Try fallback model
     try {
-      const gemini = getGeminiClient()
-      const conversationPrompt = messages
-        .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
-        .join("\n\n")
-
       const result = await generateText({
         model: gemini("gemini-1.5-flash"),
         system: systemPrompt,
