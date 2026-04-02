@@ -8,29 +8,40 @@ import { generateChat } from "@/lib/ai"
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { message, history, contractType, contractName, currentField, allFields } = body
+    const { message, history, contractType, contractName, currentField, allFields, formData } = body
 
     if (!message || !contractType) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    const systemPrompt = `You are an expert contract assistant helping users fill out a ${contractName || contractType} contract.
+    // Build a summary of what the user has already filled in
+    const filledEntries = allFields
+      ?.filter((f: any) => formData?.[f.id])
+      .map((f: any) => `- ${f.label}: ${formData[f.id]}`)
+      .join("\n") || ""
 
-Your role is to:
-- Guide users through filling out contract fields in a friendly, conversational way
-- Explain complex legal terms in simple language
-- Provide examples when helpful
-- Ask clarifying questions if the user's input is unclear
-- Suggest reasonable defaults or common practices when appropriate
-- Be encouraging and professional
-- NEVER provide actual legal advice - remind users to consult an attorney for legal guidance
+    const emptyFields = allFields
+      ?.filter((f: any) => !formData?.[f.id])
+      .map((f: any) => f.label)
+      .join(", ") || ""
 
-Current field being discussed: ${currentField?.label || "General questions"}
-${currentField?.description ? `Field description: ${currentField.description}` : ""}
+    const systemPrompt = `You are an expert contract assistant helping a user fill out a ${contractName || contractType} contract.
 
-Contract fields available: ${allFields?.map((f: any) => f.label).join(", ")}
+CONTRACT DATA SO FAR:
+${filledEntries || "(Nothing filled in yet)"}
 
-Keep responses concise (2-3 sentences typically) and action-oriented.`
+FIELDS STILL NEEDED: ${emptyFields || "All fields complete"}
+
+CURRENT FIELD: ${currentField?.label || "General questions"}${currentField?.description ? ` — ${currentField.description}` : ""}
+
+Your job:
+- Answer questions by referencing the ACTUAL data already entered above — use real names, dates, and amounts, never placeholders
+- When the user provides a value, confirm it clearly and note which field it fills
+- Suggest what to enter for the current field based on context from already-filled fields
+- Explain legal terms in plain language
+- If a field is unclear, ask one focused clarifying question
+- Keep responses to 2-3 sentences unless more detail is genuinely needed
+- Do NOT give legal advice — recommend an attorney for legal questions`
 
     const messages = (history || []).map((msg: { role: string; content: string }) => ({
       role: msg.role as "user" | "assistant",
@@ -42,8 +53,8 @@ Keep responses concise (2-3 sentences typically) and action-oriented.`
     const responseText = await generateChat({
       systemPrompt,
       messages,
-      maxOutputTokens: 300,
-      temperature: 0.8,
+      maxOutputTokens: 600,
+      temperature: 0.7,
     })
 
     return NextResponse.json({

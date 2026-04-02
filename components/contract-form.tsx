@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { ChevronLeft, ChevronRight, Send, Loader2, MessageSquare, FileText, CreditCard, Zap, Crown } from "lucide-react"
 import type { ContractTemplate, ContractField } from "@/lib/contracts"
@@ -35,7 +34,7 @@ export function ContractForm({
   const [chatMessages, setChatMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([
     {
       role: "assistant",
-      content: `Hi! I'm your AI contract assistant. I'm here to help you fill out the ${contract.name}. I can answer questions, provide examples, and guide you through each field. What would you like to know, or shall we get started with the first field: ${contract.fields[0].label}?`,
+      content: `Hi! I'm your contract assistant for the ${contract.name}. Ask me anything or just tell me the ${contract.fields[0].label} to get started.`,
     },
   ])
   const [chatInput, setChatInput] = useState("")
@@ -45,7 +44,6 @@ export function ContractForm({
   const fieldsPerStep = 4
   const totalSteps = Math.ceil(contract.fields.length / fieldsPerStep)
   const currentFields = contract.fields.slice(currentStep * fieldsPerStep, (currentStep + 1) * fieldsPerStep)
-
   const progress = ((currentStep + 1) / totalSteps) * 100
 
   const handleInputChange = (fieldId: string, value: string) => {
@@ -53,15 +51,11 @@ export function ContractForm({
   }
 
   const handleNext = () => {
-    if (currentStep < totalSteps - 1) {
-      setCurrentStep((prev) => prev + 1)
-    }
+    if (currentStep < totalSteps - 1) setCurrentStep((prev) => prev + 1)
   }
 
   const handlePrevious = () => {
-    if (currentStep > 0) {
-      setCurrentStep((prev) => prev - 1)
-    }
+    if (currentStep > 0) setCurrentStep((prev) => prev - 1)
   }
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -76,11 +70,9 @@ export function ContractForm({
     const userMessage = chatInput
     setChatInput("")
     setChatMessages((prev) => [...prev, { role: "user", content: userMessage }])
-
     setIsChatLoading(true)
 
     try {
-      // Call AI chat assistant API
       const response = await fetch("/api/chat-assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -91,16 +83,15 @@ export function ContractForm({
           contractName: contract.name,
           currentField: contract.fields[currentChatField],
           allFields: contract.fields,
+          formData,
         }),
       })
 
       const data = await response.json()
 
       if (data.success && data.response) {
-        // Auto-extract field values if the message looks like field data
         const currentField = contract.fields[currentChatField]
         if (currentField && userMessage.toLowerCase() !== "skip") {
-          // Simple heuristic: if message is not a question, treat as field value
           if (!userMessage.includes("?") && !userMessage.startsWith("what") && !userMessage.startsWith("how")) {
             setFormData((prev) => ({ ...prev, [currentField.id]: userMessage }))
           }
@@ -108,7 +99,6 @@ export function ContractForm({
 
         setChatMessages((prev) => [...prev, { role: "assistant", content: data.response }])
 
-        // Check if we should move to next field
         if (
           data.response.toLowerCase().includes("next") ||
           data.response.toLowerCase().includes("moving on") ||
@@ -123,7 +113,6 @@ export function ContractForm({
       }
     } catch (error) {
       console.error("Chat error:", error)
-      // Fallback to simple mode
       const currentField = contract.fields[currentChatField]
       if (userMessage.toLowerCase() !== "skip") {
         setFormData((prev) => ({ ...prev, [currentField.id]: userMessage }))
@@ -135,18 +124,14 @@ export function ContractForm({
           ...prev,
           {
             role: "assistant",
-            content: `Got it! Now, what is the ${nextField.label.toLowerCase()}?${nextField.description ? ` (${nextField.description})` : ""}`,
+            content: `Got it! Next: ${nextField.label.toLowerCase()}?${nextField.description ? ` (${nextField.description})` : ""}`,
           },
         ])
         setCurrentChatField((prev) => prev + 1)
       } else {
         setChatMessages((prev) => [
           ...prev,
-          {
-            role: "assistant",
-            content:
-              "Perfect! I have all the information needed. Click the 'Generate Contract' button below to create your personalized contract.",
-          },
+          { role: "assistant", content: "All fields complete! Click Generate Contract below." },
         ])
       }
     } finally {
@@ -163,19 +148,18 @@ export function ContractForm({
     const value = formData[field.id] || ""
 
     return (
-      <div key={field.id} className="space-y-2">
-        <Label htmlFor={field.id} className="text-foreground flex items-center justify-between">
-          <span className="flex items-center gap-2">
+      <div key={field.id} className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <Label htmlFor={field.id} className="text-sm font-medium text-foreground">
             {field.label}
-            <span className="text-muted-foreground text-xs">Optional</span>
-          </span>
+          </Label>
           <FieldExplanationTooltip
             fieldLabel={field.label}
             fieldDescription={field.description}
             contractType={contract.name}
             fieldName={field.name}
           />
-        </Label>
+        </div>
         {field.description && <p className="text-xs text-muted-foreground">{field.description}</p>}
         {field.type === "textarea" ? (
           <Textarea
@@ -183,28 +167,12 @@ export function ContractForm({
             value={value}
             onChange={(e) => handleInputChange(field.id, e.target.value)}
             placeholder={field.placeholder}
-            className="bg-input border-border text-foreground placeholder:text-muted-foreground"
-          />
-        ) : field.type === "date" ? (
-          <Input
-            id={field.id}
-            type="date"
-            value={value}
-            onChange={(e) => handleInputChange(field.id, e.target.value)}
-            className="bg-input border-border text-foreground"
-          />
-        ) : field.type === "number" ? (
-          <Input
-            id={field.id}
-            type="number"
-            value={value}
-            onChange={(e) => handleInputChange(field.id, e.target.value)}
-            placeholder={field.placeholder}
-            className="bg-input border-border text-foreground placeholder:text-muted-foreground"
+            className="bg-input border-border text-foreground placeholder:text-muted-foreground resize-none"
+            rows={3}
           />
         ) : field.type === "currency" ? (
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
             <Input
               id={field.id}
               type="number"
@@ -224,12 +192,12 @@ export function ContractForm({
               placeholder={field.placeholder || "0"}
               className="bg-input border-border text-foreground placeholder:text-muted-foreground pr-7"
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
           </div>
         ) : (
           <Input
             id={field.id}
-            type={field.type}
+            type={field.type === "date" ? "date" : field.type === "number" ? "number" : field.type}
             value={value}
             onChange={(e) => handleInputChange(field.id, e.target.value)}
             placeholder={field.placeholder}
@@ -240,229 +208,208 @@ export function ContractForm({
     )
   }
 
-  const renderGenerateButton = (isFullWidth = false) => {
-    const buttonGroup = (
-      <div className={`flex gap-2 ${isFullWidth ? "w-full" : ""}`}>
+  const GenerateButton = ({ fullWidth = false }: { fullWidth?: boolean }) => (
+    <div className={`flex gap-2 ${fullWidth ? "w-full" : ""}`}>
+      <Button
+        type="button"
+        variant="outline"
+        onClick={handlePreview}
+        className="border-border hover:bg-secondary bg-transparent px-4"
+      >
+        <Eye className="w-4 h-4 mr-2" />
+        Preview
+      </Button>
+
+      {showPaymentPrompt ? (
         <Button
-          type="button"
-          variant="outline"
-          onClick={handlePreview}
-          size="lg"
-          className="border-border hover:bg-secondary bg-transparent min-h-[48px] px-6"
+          type="submit"
+          disabled={isSubmitting}
+          className={`bg-primary hover:bg-primary/90 text-primary-foreground font-semibold flex-1`}
         >
-          <Eye className="w-5 h-5 mr-2" />
-          Preview
+          {isSubmitting ? (
+            <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processing...</>
+          ) : (
+            <><CreditCard className="w-4 h-4 mr-2" />Generate — $19.99</>
+          )}
         </Button>
-
-        {showPaymentPrompt ? (
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-            size="lg"
-            className={`bg-gradient-to-r from-primary to-amber-500 hover:from-primary/90 hover:to-amber-500/90 text-white font-semibold text-base min-h-[48px] flex-1`}
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <CreditCard className="w-5 h-5 mr-2" />
-                Generate Contract - $19.99
-              </>
-            )}
-          </Button>
-        ) : (
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-            size="lg"
-            className={`bg-primary text-primary-foreground hover:bg-primary/90 min-h-[48px] flex-1`}
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Send className="w-5 h-5 mr-2" />
-                Generate Contract
-              </>
-            )}
-          </Button>
-        )}
-      </div>
-    )
-
-    return buttonGroup
-  }
+      ) : (
+        <Button
+          type="submit"
+          disabled={isSubmitting}
+          className="bg-primary text-primary-foreground hover:bg-primary/90 flex-1"
+        >
+          {isSubmitting ? (
+            <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generating...</>
+          ) : (
+            <><Send className="w-4 h-4 mr-2" />Generate Contract</>
+          )}
+        </Button>
+      )}
+    </div>
+  )
 
   return (
-    <div className="space-y-6">
-      <div className="flex gap-2 mb-6">
-        <Button
-          variant={mode === "form" ? "default" : "outline"}
+    <div className="space-y-4">
+      {/* Mode toggle */}
+      <div className="flex gap-1 p-1 bg-secondary rounded-lg w-fit">
+        <button
           onClick={() => setMode("form")}
-          className={mode === "form" ? "bg-primary text-primary-foreground" : "border-border"}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            mode === "form"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
         >
-          <FileText className="w-4 h-4 mr-2" />
-          Form Mode
-        </Button>
-        <Button
-          variant={mode === "chat" ? "default" : "outline"}
+          <FileText className="w-3.5 h-3.5" />
+          Form
+        </button>
+        <button
           onClick={() => setMode("chat")}
-          className={mode === "chat" ? "bg-primary text-primary-foreground" : "border-border"}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            mode === "chat"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
         >
-          <MessageSquare className="w-4 h-4 mr-2" />
-          Chat Mode
-        </Button>
+          <MessageSquare className="w-3.5 h-3.5" />
+          AI Chat
+        </button>
       </div>
 
       {mode === "form" ? (
-        <form onSubmit={handleFormSubmit}>
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <div className="flex items-center justify-between mb-4">
-                <CardTitle className="text-foreground">
-                  Step {currentStep + 1} of {totalSteps}
-                </CardTitle>
-                <span className="text-sm text-muted-foreground">{Math.round(progress)}% complete</span>
-              </div>
-              <Progress value={progress} className="h-2 bg-secondary" />
-              <CardDescription className="text-muted-foreground mt-4">
-                Fill in the information for your contract. All fields are optional.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {currentFields.map(renderField)}
-
-              <div className="flex justify-between pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handlePrevious}
-                  disabled={currentStep === 0}
-                  className="border-border hover:bg-secondary bg-transparent"
-                >
-                  <ChevronLeft className="w-4 h-4 mr-2" />
-                  Previous
-                </Button>
-
-                {currentStep === totalSteps - 1 ? (
-                  renderGenerateButton()
-                ) : (
-                  <Button
-                    type="button"
-                    onClick={handleNext}
-                    className="bg-primary text-primary-foreground hover:bg-primary/90"
-                  >
-                    Next
-                    <ChevronRight className="w-4 h-4 ml-2" />
-                  </Button>
-                )}
-              </div>
-
-              {currentStep === totalSteps - 1 && showPaymentPrompt && (
-                <div className="border-t border-border pt-4 mt-4">
-                  <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-primary" />
-                      <span>
-                        Single: <strong className="text-foreground">$19.99</strong>
-                      </span>
-                    </div>
-                    <span className="text-border">|</span>
-                    <div className="flex items-center gap-2">
-                      <Crown className="w-4 h-4 text-amber-500" />
-                      <span>
-                        Unlimited: <strong className="text-amber-500">$9.99/mo</strong>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </form>
-      ) : (
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-foreground flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-primary" />
-              Conversational Form
-            </CardTitle>
-            <CardDescription className="text-muted-foreground">
-              Answer questions one at a time to fill out your contract. Type "skip" to leave any field blank.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[400px] overflow-y-auto mb-4 space-y-4 p-4 bg-secondary/30 rounded-lg">
-              {chatMessages.map((message, index) => (
-                <div key={index} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div
-                    className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                      message.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-card border border-border text-foreground"
-                    }`}
-                  >
-                    {message.content}
-                  </div>
-                </div>
-              ))}
+        <form onSubmit={handleFormSubmit} className="space-y-4">
+          {/* Progress */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Step {currentStep + 1} of {totalSteps}</span>
+              <span>{Math.round(progress)}%</span>
             </div>
+            <Progress value={progress} className="h-1.5 bg-secondary" />
+          </div>
 
-            <form onSubmit={handleChatSubmit} className="flex gap-2">
-              <Input
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Type your answer or 'skip' to leave blank..."
-                className="bg-input border-border text-foreground placeholder:text-muted-foreground"
-                disabled={currentChatField >= contract.fields.length}
-              />
+          {/* Fields */}
+          <div className="space-y-4 py-2">
+            {currentFields.map(renderField)}
+          </div>
+
+          {/* Navigation */}
+          <div className="flex items-center justify-between pt-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handlePrevious}
+              disabled={currentStep === 0}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <ChevronLeft className="w-4 h-4 mr-1" />
+              Back
+            </Button>
+
+            {currentStep === totalSteps - 1 ? (
+              <GenerateButton />
+            ) : (
               <Button
-                type="submit"
-                disabled={currentChatField >= contract.fields.length || !chatInput.trim() || isChatLoading}
+                type="button"
+                onClick={handleNext}
                 className="bg-primary text-primary-foreground hover:bg-primary/90"
               >
-                {isChatLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                Next
+                <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
-            </form>
+            )}
+          </div>
 
-            {currentChatField >= contract.fields.length && (
-              <div className="mt-4">
-                {renderGenerateButton(true)}
-
-                {showPaymentPrompt && (
-                  <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground mt-3">
-                    <div className="flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-primary" />
-                      <span>
-                        Single: <strong className="text-foreground">$19.99</strong>
-                      </span>
-                    </div>
-                    <span className="text-border">|</span>
-                    <div className="flex items-center gap-2">
-                      <Crown className="w-4 h-4 text-amber-500" />
-                      <span>
-                        Unlimited: <strong className="text-amber-500">$9.99/mo</strong>
-                      </span>
-                    </div>
-                  </div>
-                )}
+          {/* Pricing hint */}
+          {currentStep === totalSteps - 1 && showPaymentPrompt && (
+            <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground pt-1 border-t border-border">
+              <span className="flex items-center gap-1">
+                <Zap className="w-3 h-3 text-primary" />
+                Single <strong className="text-foreground">$19.99</strong>
+              </span>
+              <span className="text-border">·</span>
+              <span className="flex items-center gap-1">
+                <Crown className="w-3 h-3 text-amber-500" />
+                Unlimited <strong className="text-amber-500">$9.99/mo</strong>
+              </span>
+            </div>
+          )}
+        </form>
+      ) : (
+        <div className="space-y-3">
+          {/* Chat window */}
+          <div className="h-[380px] overflow-y-auto space-y-3 p-4 bg-secondary/30 rounded-xl border border-border">
+            {chatMessages.map((message, index) => (
+              <div key={index} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div
+                  className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                    message.role === "user"
+                      ? "bg-primary text-primary-foreground rounded-br-sm"
+                      : "bg-card border border-border text-foreground rounded-bl-sm"
+                  }`}
+                >
+                  {message.content}
+                </div>
+              </div>
+            ))}
+            {isChatLoading && (
+              <div className="flex justify-start">
+                <div className="bg-card border border-border rounded-2xl rounded-bl-sm px-4 py-2.5">
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                </div>
               </div>
             )}
+          </div>
 
-            <div className="mt-4 text-center">
-              <Progress value={(currentChatField / contract.fields.length) * 100} className="h-2 bg-secondary" />
-              <p className="text-xs text-muted-foreground mt-2">
-                {currentChatField} of {contract.fields.length} fields completed
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+          {/* Input */}
+          <form onSubmit={handleChatSubmit} className="flex gap-2">
+            <Input
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              placeholder={
+                currentChatField < contract.fields.length
+                  ? `Enter ${contract.fields[currentChatField]?.label?.toLowerCase() || "your answer"}…`
+                  : "All fields complete"
+              }
+              className="bg-input border-border text-foreground placeholder:text-muted-foreground"
+              disabled={currentChatField >= contract.fields.length}
+            />
+            <Button
+              type="submit"
+              disabled={currentChatField >= contract.fields.length || !chatInput.trim() || isChatLoading}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 px-3"
+            >
+              <Send className="w-4 h-4" />
+            </Button>
+          </form>
+
+          {/* Progress */}
+          <div className="space-y-1">
+            <Progress value={(currentChatField / contract.fields.length) * 100} className="h-1 bg-secondary" />
+            <p className="text-xs text-muted-foreground text-center">
+              {currentChatField} / {contract.fields.length} fields
+            </p>
+          </div>
+
+          {/* Generate button when done */}
+          {currentChatField >= contract.fields.length && (
+            <form onSubmit={handleFormSubmit} className="space-y-2">
+              <GenerateButton fullWidth />
+              {showPaymentPrompt && (
+                <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <Zap className="w-3 h-3 text-primary" />
+                    Single <strong className="text-foreground">$19.99</strong>
+                  </span>
+                  <span className="text-border">·</span>
+                  <span className="flex items-center gap-1">
+                    <Crown className="w-3 h-3 text-amber-500" />
+                    Unlimited <strong className="text-amber-500">$9.99/mo</strong>
+                  </span>
+                </div>
+              )}
+            </form>
+          )}
+        </div>
       )}
     </div>
   )
