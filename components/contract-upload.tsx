@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Upload, FileText, X, Loader2 } from "lucide-react"
-import { saveUploadedFile, type UploadedFile } from "@/lib/contract-store"
+import type { UploadedFile } from "@/lib/contract-store"
 
 interface ContractUploadProps {
   onUpload: (file: UploadedFile) => void
@@ -52,50 +52,33 @@ export function ContractUpload({ onUpload }: ContractUploadProps) {
     setUploadStatus("Uploading file...")
 
     try {
-      const fileExt = selectedFile.name.split(".").pop()
-      const fileUrl = URL.createObjectURL(selectedFile)
+      setUploadStatus("Processing & uploading document...")
 
-      setUploadStatus("Processing document with AI...")
+      const formData = new FormData()
+      formData.append("file", selectedFile)
 
-      let extractedText = ""
-      try {
-        const formData = new FormData()
-        formData.append("file", selectedFile)
-
-        const processResponse = await fetch("/api/process-document", {
-          method: "POST",
-          body: formData,
-        })
-
-        if (processResponse.ok) {
-          const processData = await processResponse.json()
-          extractedText = processData.content || ""
-        }
-      } catch (processError) {
-        console.warn("Document processing failed:", processError)
-      }
-
-      setUploadStatus("Saving to database...")
-
-      const uploadedFile = await saveUploadedFile({
-        file_name: selectedFile.name,
-        file_type: selectedFile.type || `application/${fileExt}`,
-        file_size: selectedFile.size,
-        storage_path: fileUrl,
-        extracted_text: extractedText, // Save extracted text
+      const response = await fetch("/api/upload-file", {
+        method: "POST",
+        body: formData,
       })
 
-      if (uploadedFile) {
-        onUpload(uploadedFile)
-        router.push(`/files/${uploadedFile.id}`)
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error || "Upload failed")
       }
+
+      const uploadedFile = await response.json()
+
+      setUploadStatus("Done!")
+      onUpload(uploadedFile)
+      router.push(`/files/${uploadedFile.id}`)
     } catch (error) {
       console.error("Upload error:", error)
-      setUploadStatus("Upload failed")
+      setUploadStatus(error instanceof Error ? error.message : "Upload failed")
     } finally {
       setSelectedFile(null)
       setUploading(false)
-      setUploadStatus("")
+      setTimeout(() => setUploadStatus(""), 3000)
     }
   }
 

@@ -22,6 +22,9 @@ import {
   ArrowRight,
   Clock,
   Star,
+  Upload,
+  TrendingUp,
+  Users,
 } from "lucide-react"
 import Link from "next/link"
 import { motion } from "framer-motion"
@@ -98,26 +101,34 @@ export default function HomePage() {
             your music business with AI-powered documentation.
           </motion.p>
 
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}
-            className="flex flex-wrap justify-center gap-4 mb-12"
+            className="flex flex-wrap justify-center gap-4 mb-6"
           >
             <Link href="#contracts">
-              <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground group transition-all duration-300 transform shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:-translate-y-1">
-                Generate Contract <Sparkles className="w-4 h-4 ml-2 group-hover:scale-125 transition-transform" />
+              <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground group transition-all duration-300 transform shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:-translate-y-1 h-14 px-8 text-base">
+                Generate Contract Free <Sparkles className="w-4 h-4 ml-2 group-hover:scale-125 transition-transform" />
               </Button>
             </Link>
-            <Link href="/templates">
-              <Button size="lg" variant="outline" className="group transition-all duration-300 hover:bg-accent hover:text-accent-foreground hover:border-accent hover:-translate-y-1">
-                Free Templates <Download className="w-4 h-4 ml-2 group-hover:-translate-y-1 transition-transform" />
+            <Link href="/pricing">
+              <Button size="lg" variant="outline" className="group transition-all duration-300 hover:bg-accent hover:text-accent-foreground hover:border-accent hover:-translate-y-1 h-14 px-8 text-base">
+                View Pricing <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
               </Button>
             </Link>
           </motion.div>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+            className="text-sm text-muted-foreground mb-12"
+          >
+            No credit card required to start &mdash; free templates available instantly
+          </motion.p>
 
           {/* Trust Indicators */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 1, delay: 0.5 }}
@@ -148,6 +159,15 @@ export default function HomePage() {
               <div className="text-left">
                 <p className="font-semibold text-foreground">Legally Sound</p>
                 <p className="text-sm text-muted-foreground">Professional language</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 group cursor-default">
+              <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center group-hover:bg-green-500/20 transition-colors">
+                <Users className="w-5 h-5 text-green-500" />
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-foreground">5,000+ Professionals</p>
+                <p className="text-sm text-muted-foreground">Trust Artispreneur</p>
               </div>
             </div>
           </motion.div>
@@ -324,102 +344,142 @@ export default function HomePage() {
           </p>
         </motion.div>
 
-        <motion.div 
+        <motion.div
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-100px" }}
           variants={staggerContainer}
-          className="grid md:grid-cols-3 gap-8"
+          className="grid md:grid-cols-2 lg:grid-cols-4 gap-8"
         >
           <motion.div variants={fadeIn} className="h-full">
             <Card className="bg-card/50 backdrop-blur-sm border-border/40 hover:border-primary/50 transition-all duration-300 hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1 h-full flex flex-col">
-            <CardHeader>
-              <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-                <Sparkles className="w-7 h-7 text-primary" />
-              </div>
-              <CardTitle className="text-xl">AI Contract Generation</CardTitle>
-              <CardDescription>Generate complete, professional contracts in minutes</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-3 text-sm text-muted-foreground">
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-                  <span>21+ industry-specific templates</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-                  <span>Customized to your specific terms</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-                  <span>Legally structured language</span>
-                </li>
-              </ul>
-            </CardContent>
+              <CardHeader>
+                <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
+                  <Sparkles className="w-7 h-7 text-primary" />
+                </div>
+                <CardTitle className="text-xl">AI Generation</CardTitle>
+                <CardDescription>Complete professional contracts in minutes</CardDescription>
+              </CardHeader>
+              <CardContent className="flex-1 flex flex-col justify-between">
+                <ul className="space-y-3 text-sm text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                    <span>{contractTemplates.length}+ industry templates</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                    <span>Customized to your terms</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                    <span>Legally structured language</span>
+                  </li>
+                </ul>
+                <Link href="#contracts" className="mt-6">
+                  <Button className="w-full bg-primary hover:bg-primary/90">
+                    Start Free <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </Link>
+              </CardContent>
             </Card>
           </motion.div>
 
           <motion.div variants={fadeIn} className="h-full">
             <Card className="bg-card/50 backdrop-blur-sm border-border/40 hover:border-accent/50 transition-all duration-300 hover:shadow-xl hover:shadow-accent/5 hover:-translate-y-1 h-full flex flex-col">
-            <CardHeader>
-              <div className="w-14 h-14 rounded-xl bg-accent/10 flex items-center justify-center mb-4">
-                <Brain className="w-7 h-7 text-accent" />
-              </div>
-              <CardTitle className="text-xl">Upload & Analyze</CardTitle>
-              <CardDescription>AI-powered analysis of any contract you receive</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-3 text-sm text-muted-foreground">
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-accent mt-0.5 shrink-0" />
-                  <span>Support for PDF, DOCX, and more</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-accent mt-0.5 shrink-0" />
-                  <span>Identify risks and key terms</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-accent mt-0.5 shrink-0" />
-                  <span>Chat to ask questions</span>
-                </li>
-              </ul>
-            </CardContent>
+              <CardHeader>
+                <div className="w-14 h-14 rounded-xl bg-accent/10 flex items-center justify-center mb-4">
+                  <Brain className="w-7 h-7 text-accent" />
+                </div>
+                <CardTitle className="text-xl">AI Analysis</CardTitle>
+                <CardDescription>Instantly understand any contract you receive</CardDescription>
+              </CardHeader>
+              <CardContent className="flex-1 flex flex-col justify-between">
+                <ul className="space-y-3 text-sm text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-accent mt-0.5 shrink-0" />
+                    <span>Upload PDF, DOCX &amp; more</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-accent mt-0.5 shrink-0" />
+                    <span>Identify risks and red flags</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-accent mt-0.5 shrink-0" />
+                    <span>Chat with AI about any clause</span>
+                  </li>
+                </ul>
+                <Link href="/auth/sign-up" className="mt-6">
+                  <Button variant="outline" className="w-full border-accent text-accent hover:bg-accent/10 bg-transparent">
+                    Try Analysis <Upload className="w-4 h-4 ml-2" />
+                  </Button>
+                </Link>
+              </CardContent>
             </Card>
           </motion.div>
 
           <motion.div variants={fadeIn} className="h-full">
             <Card className="bg-card/50 backdrop-blur-sm border-border/40 hover:border-chart-5/50 transition-all duration-300 hover:shadow-xl hover:shadow-chart-5/5 hover:-translate-y-1 h-full flex flex-col">
-            <CardHeader>
-              <div className="w-14 h-14 rounded-xl bg-chart-5/10 flex items-center justify-center mb-4">
-                <Download className="w-7 h-7 text-chart-5" />
-              </div>
-              <CardTitle className="text-xl">Free Templates</CardTitle>
-              <CardDescription>Download professional templates at no cost</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-3 text-sm text-muted-foreground">
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-chart-5 mt-0.5 shrink-0" />
-                  <span>Industry-standard formats</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-chart-5 mt-0.5 shrink-0" />
-                  <span>Preview before download</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-chart-5 mt-0.5 shrink-0" />
-                  <span>Email delivery included</span>
-                </li>
-              </ul>
-              <Link href="/templates">
-                <Button
-                  variant="outline"
-                  className="w-full mt-6 border-chart-5 text-chart-5 hover:bg-chart-5/10 bg-transparent"
-                >
-                  Browse Templates <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </Link>
-            </CardContent>
+              <CardHeader>
+                <div className="w-14 h-14 rounded-xl bg-chart-5/10 flex items-center justify-center mb-4">
+                  <Download className="w-7 h-7 text-chart-5" />
+                </div>
+                <CardTitle className="text-xl">Free Templates</CardTitle>
+                <CardDescription>Download professional templates instantly</CardDescription>
+              </CardHeader>
+              <CardContent className="flex-1 flex flex-col justify-between">
+                <ul className="space-y-3 text-sm text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-chart-5 mt-0.5 shrink-0" />
+                    <span>Industry-standard formats</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-chart-5 mt-0.5 shrink-0" />
+                    <span>Preview before download</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-chart-5 mt-0.5 shrink-0" />
+                    <span>Email delivery included</span>
+                  </li>
+                </ul>
+                <Link href="/templates" className="mt-6">
+                  <Button variant="outline" className="w-full border-chart-5 text-chart-5 hover:bg-chart-5/10 bg-transparent">
+                    Browse Templates <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div variants={fadeIn} className="h-full">
+            <Card className="bg-card/50 backdrop-blur-sm border-border/40 hover:border-green-500/50 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/5 hover:-translate-y-1 h-full flex flex-col">
+              <CardHeader>
+                <div className="w-14 h-14 rounded-xl bg-green-500/10 flex items-center justify-center mb-4">
+                  <TrendingUp className="w-7 h-7 text-green-500" />
+                </div>
+                <CardTitle className="text-xl">PDF Preview &amp; Export</CardTitle>
+                <CardDescription>Print-ready PDFs with one click</CardDescription>
+              </CardHeader>
+              <CardContent className="flex-1 flex flex-col justify-between">
+                <ul className="space-y-3 text-sm text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                    <span>Professional formatted output</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                    <span>Preview before downloading</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                    <span>Ready to sign and send</span>
+                  </li>
+                </ul>
+                <Link href="/pricing" className="mt-6">
+                  <Button variant="outline" className="w-full border-green-500 text-green-500 hover:bg-green-500/10 bg-transparent">
+                    See Pricing <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </Link>
+              </CardContent>
             </Card>
           </motion.div>
         </motion.div>
