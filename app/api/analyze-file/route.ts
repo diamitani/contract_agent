@@ -1,17 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createGoogleGenerativeAI } from "@ai-sdk/google"
-import { generateText } from "ai"
 import JSZip from "jszip"
 import { getCurrentUser } from "@/lib/auth/current-user"
 import { getUploadedFileById, getUserProfile, updateUploadedFile } from "@/lib/cosmos/store"
-
-const getGeminiClient = () => {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY
-  if (!apiKey) {
-    throw new Error("Gemini API key not configured")
-  }
-  return createGoogleGenerativeAI({ apiKey })
-}
+import { generateWithFallback } from "@/lib/ai"
 
 async function extractTextFromFile(buffer: ArrayBuffer, contentType: string, fileName: string): Promise<string> {
   const fileNameLower = fileName.toLowerCase()
@@ -132,8 +123,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const gemini = getGeminiClient()
-
     const analysisPrompt = `You are a contract analysis expert. Analyze the following contract document and provide a comprehensive overview.
 
 CONTRACT TEXT:
@@ -161,7 +150,7 @@ Provide your analysis as a JSON object with this structure:
   "dates": ["important dates, deadlines, or timeframes mentioned"]
 }
 
-IMPORTANT: 
+IMPORTANT:
 - Extract ACTUAL names, amounts, and dates from the document
 - Be specific - don't use placeholders like "Party A" if real names are available
 - Respond with ONLY the JSON object, no markdown code blocks or explanations`
@@ -180,59 +169,28 @@ IMPORTANT:
       dates: [] as string[],
     }
 
+    let usedModel = "unknown"
     try {
-      const result = await generateText({
-        model: gemini("gemini-2.0-flash-exp"),
-        prompt: analysisPrompt,
-        maxTokens: 3000,
+      const { text, model } = await generateWithFallback({
+        systemPrompt: "You are a contract analysis expert. Always respond with valid JSON only.",
+        userPrompt: analysisPrompt,
+        maxOutputTokens: 3000,
         temperature: 0.2,
       })
+      usedModel = model
 
-      let responseText = result.text.trim()
-      console.log(`[v0] Gemini response length: ${responseText.length}`)
-
-      // Clean up response
-      responseText = responseText
-        .replace(/```json\s*/gi, "")
-        .replace(/```\s*/g, "")
-        .trim()
-
-      const firstBrace = responseText.indexOf("{")
-      const lastBrace = responseText.lastIndexOf("}")
+      const cleaned = text.trim().replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim()
+      const firstBrace = cleaned.indexOf("{")
+      const lastBrace = cleaned.lastIndexOf("}")
 
       if (firstBrace !== -1 && lastBrace > firstBrace) {
-        const jsonStr = responseText.slice(firstBrace, lastBrace + 1)
-        analysis = JSON.parse(jsonStr)
-        console.log("[v0] Analysis parsed successfully")
+        analysis = JSON.parse(cleaned.slice(firstBrace, lastBrace + 1))
+        console.log(`[analyze-file] Parsed successfully via ${model}`)
       }
-    } catch (geminiError) {
-      console.error("[v0] Gemini analysis error:", geminiError)
-
-      // Try fallback model
-      try {
-        const result = await generateText({
-          model: gemini("gemini-1.5-flash"),
-          prompt: analysisPrompt,
-          maxTokens: 3000,
-          temperature: 0.2,
-        })
-
-        const responseText = result.text
-          .trim()
-          .replace(/```json\s*/gi, "")
-          .replace(/```\s*/g, "")
-
-        const firstBrace = responseText.indexOf("{")
-        const lastBrace = responseText.lastIndexOf("}")
-
-        if (firstBrace !== -1 && lastBrace > firstBrace) {
-          analysis = JSON.parse(responseText.slice(firstBrace, lastBrace + 1))
-        }
-      } catch (fallbackError) {
-        console.error("[v0] Fallback analysis error:", fallbackError)
-        analysis.summary = `Document contains ${extractedText.length} characters. Manual review recommended.`
-        analysis.risks = ["Automated analysis failed - please review manually"]
-      }
+    } catch (err) {
+      console.error("[analyze-file] AI error:", err)
+      analysis.summary = `Document contains ${extractedText.length} characters. Manual review recommended.`
+      analysis.risks = ["Automated analysis failed — please review manually"]
     }
 
     // Ensure all fields exist
@@ -257,7 +215,7 @@ IMPORTANT:
       extracted_text: extractedText.slice(0, 50000),
     })
 
-    return NextResponse.json({ analysis, model: "gemini" })
+    return NextResponse.json({ analysis, model: usedModel })
   } catch (error) {
     console.error("Analysis error:", error)
     return NextResponse.json(
