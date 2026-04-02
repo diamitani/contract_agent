@@ -1,12 +1,9 @@
 "use client"
 
-import type React from "react"
-
-import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import Image from "next/image"
 import { useSearchParams } from "next/navigation"
-import { useState, Suspense } from "react"
+import { Suspense } from "react"
 import { FileText, Shield, Zap, PenTool, CheckCircle2 } from "lucide-react"
 import { OAuthButtons } from "@/components/auth/oauth-buttons"
 
@@ -34,7 +31,6 @@ const features = [
 ]
 
 function SignInForm() {
-  const [isLoading, setIsLoading] = useState(false)
   const searchParams = useSearchParams()
 
   const redirectTo = searchParams.get("redirect")
@@ -45,13 +41,6 @@ function SignInForm() {
     plan && (plan === "per_contract" || plan === "unlimited")
       ? `/checkout/${plan}${contractSlug ? `?contract=${contractSlug}` : ""}`
       : redirectTo || "/dashboard"
-
-  const handleEmailLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    const next = encodeURIComponent(oauthRedirectPath)
-    window.location.href = `/api/auth/azure/login?next=${next}`
-  }
 
   return (
     <div className="w-full max-w-md">
@@ -88,14 +77,6 @@ function SignInForm() {
         <OAuthButtons redirectPath={oauthRedirectPath} mode="signin" />
       </div>
 
-      <form onSubmit={handleEmailLogin} className="space-y-4">
-        <div className="rounded-lg border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
-          Sign-in is managed with Microsoft Azure Active Directory.
-        </div>
-        <Button type="submit" className="w-full h-12 text-base font-semibold" disabled={isLoading}>
-          {isLoading ? "Redirecting..." : plan ? "Continue to Microsoft Sign-in" : "Sign in with Microsoft"}
-        </Button>
-      </form>
 
       <div className="mt-8 pt-6 border-t border-border">
         <p className="text-center text-muted-foreground">
