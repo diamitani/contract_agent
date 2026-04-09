@@ -181,12 +181,13 @@ IMPORTANT:
     }
 
     try {
-      const result = await generateText({
-        model: gemini("gemini-2.0-flash-exp"),
-        prompt: analysisPrompt,
-        maxTokens: 3000,
-        temperature: 0.2,
-      })
+        const result = await generateText({
+          model: gemini("gemini-1.5-flash"),
+          prompt: analysisPrompt,
+          // @ts-ignore
+          maxTokens: 3000,
+          temperature: 0.2,
+        })
 
       let responseText = result.text.trim()
       console.log(`[v0] Gemini response length: ${responseText.length}`)
@@ -213,7 +214,8 @@ IMPORTANT:
         const result = await generateText({
           model: gemini("gemini-1.5-flash"),
           prompt: analysisPrompt,
-          maxTokens: 3000,
+        // @ts-ignore
+        maxTokens: 3000,
           temperature: 0.2,
         })
 

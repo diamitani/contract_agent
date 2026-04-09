@@ -9,6 +9,7 @@ import { PDFPreviewModal } from "@/components/pdf-preview-modal"
 import { PaymentModal } from "@/components/payment-modal"
 import { getContractBySlug } from "@/lib/contracts"
 import { saveContract } from "@/lib/contract-store"
+import { APP_ID } from "@/lib/constants"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -223,6 +224,7 @@ export default function GenerateContractPage() {
           content: fullContent,
           form_data: formData,
           status: "completed",
+          app_id: APP_ID,
         })
 
         if (savedContract) {
@@ -258,6 +260,7 @@ export default function GenerateContractPage() {
         content: mockContent,
         form_data: formData,
         status: "completed",
+        app_id: APP_ID,
       })
 
       toast({

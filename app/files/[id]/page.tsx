@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { deleteUploadedFile, getFolders, getUploadedFiles, moveFileToFolder, updateUploadedFile } from "@/lib/contract-store"
+import { deleteUploadedFile, getFolders, getUploadedFiles, moveFileToFolder, updateUploadedFile, type UploadedFile } from "@/lib/contract-store"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -49,18 +49,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import Link from "next/link"
 
-interface UploadedFile {
-  id: string
-  file_name: string
-  file_type: string
-  file_size: number
-  storage_path: string
-  folder_id: string | null
-  extracted_text: string | null
-  analysis_status: string | null
-  analysis_result: any
-  created_at: string
-}
+
 
 interface Folder {
   id: string
@@ -537,19 +526,19 @@ export default function FileViewerPage() {
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
                           <CardTitle className="text-base">Contract Overview</CardTitle>
-                          <Badge variant="secondary">{analysisResult.contract_type}</Badge>
+                          <Badge variant="secondary">{analysisResult.contract_type!}</Badge>
                         </div>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-sm text-muted-foreground leading-relaxed">{analysisResult.summary}</p>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{analysisResult.summary!}</p>
 
-                        {analysisResult.parties?.length > 0 && (
+                        {analysisResult.parties!.length > 0 && (
                           <div className="mt-4 pt-4 border-t">
                             <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
                               <Users className="w-4 h-4" /> Parties Involved
                             </h4>
                             <div className="flex flex-wrap gap-2">
-                              {analysisResult.parties.map((party: any, i: number) => (
+                              {analysisResult.parties!.map((party: any, i: number) => (
                                 <Badge key={i} variant="outline">
                                   {party.name} ({party.role})
                                 </Badge>
@@ -558,24 +547,24 @@ export default function FileViewerPage() {
                           </div>
                         )}
 
-                        {analysisResult.duration && (
+                        {analysisResult.duration! && (
                           <div className="mt-4 pt-4 border-t flex items-center gap-2">
                             <Clock className="w-4 h-4 text-muted-foreground" />
                             <span className="text-sm">
-                              <strong>Duration:</strong> {analysisResult.duration}
+                               <strong>Duration:</strong> {analysisResult.duration!}
                             </span>
                           </div>
                         )}
 
-                        {analysisResult.compensation?.description && (
+                        {analysisResult.compensation!.description && (
                           <div className="mt-4 pt-4 border-t">
                             <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
                               <DollarSign className="w-4 h-4" /> Compensation
                             </h4>
-                            <p className="text-sm text-muted-foreground">{analysisResult.compensation.description}</p>
-                            {analysisResult.compensation.details?.length > 0 && (
+                            <p className="text-sm text-muted-foreground">{analysisResult.compensation!.description}</p>
+                            {analysisResult.compensation!.details!.length > 0 && (
                               <ul className="mt-2 space-y-1">
-                                {analysisResult.compensation.details.map((detail: string, i: number) => (
+                                {analysisResult.compensation!.details!.map((detail: string, i: number) => (
                                   <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
                                     <span className="text-primary">•</span> {detail}
                                   </li>
@@ -588,14 +577,14 @@ export default function FileViewerPage() {
                     </Card>
 
                     {/* Key Terms */}
-                    {analysisResult.key_terms?.length > 0 && (
+                    {analysisResult.key_terms!.length > 0 && (
                       <Card>
                         <CardHeader className="pb-3">
                           <CardTitle className="text-base">Key Terms</CardTitle>
                         </CardHeader>
                         <CardContent>
                           <div className="flex flex-wrap gap-2">
-                            {analysisResult.key_terms.map((term: string, i: number) => (
+                            {analysisResult.key_terms!.map((term: string, i: number) => (
                               <Badge key={i} variant="secondary">
                                 {term}
                               </Badge>
@@ -606,14 +595,14 @@ export default function FileViewerPage() {
                     )}
 
                     {/* Obligations */}
-                    {analysisResult.obligations?.length > 0 && (
+                    {analysisResult.obligations!.length > 0 && (
                       <Card>
                         <CardHeader className="pb-3">
                           <CardTitle className="text-base">Obligations</CardTitle>
                         </CardHeader>
                         <CardContent>
                           <ul className="space-y-2">
-                            {analysisResult.obligations.map((ob: any, i: number) => (
+                            {analysisResult.obligations!.map((ob: any, i: number) => (
                               <li key={i} className="text-sm flex items-start gap-2">
                                 <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
                                 <span>
@@ -627,7 +616,7 @@ export default function FileViewerPage() {
                     )}
 
                     {/* Risks */}
-                    {analysisResult.risks?.length > 0 && (
+                    {analysisResult.risks!.length > 0 && (
                       <Card className="border-amber-500/30">
                         <CardHeader className="pb-3">
                           <CardTitle className="text-base flex items-center gap-2">
@@ -637,7 +626,7 @@ export default function FileViewerPage() {
                         </CardHeader>
                         <CardContent>
                           <ul className="space-y-2">
-                            {analysisResult.risks.map((risk: string, i: number) => (
+                            {analysisResult.risks!.map((risk: string, i: number) => (
                               <li key={i} className="text-sm flex items-start gap-2">
                                 <Shield className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
                                 {risk}

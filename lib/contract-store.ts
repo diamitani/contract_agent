@@ -29,6 +29,10 @@ export interface UploadedFile {
     risks?: string[]
     obligations?: string[]
     dates?: string[]
+    contract_type?: string
+    parties?: Array<{ name: string; role: string }>
+    duration?: string
+    compensation?: { description?: string; details?: string[] }
   } | null
   extracted_text?: string | null
   created_at: string

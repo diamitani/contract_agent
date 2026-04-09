@@ -1,4 +1,4 @@
-import { CosmosClient, type Container } from "@azure/cosmos"
+import { CosmosClient, type Container, type SqlParameter } from "@azure/cosmos"
 import type { AuthUser } from "@/lib/auth/types"
 import { APP_ID } from "@/lib/constants"
 
@@ -146,7 +146,7 @@ async function getContainer(id: string) {
   return await containerCache.get(id)!
 }
 
-async function queryByUser<T>(containerId: string, userId: string, query: string, parameters: { name: string; value: unknown }[] = []) {
+async function queryByUser<T>(containerId: string, userId: string, query: string, parameters: SqlParameter[] = []) {
   const container = await getContainer(containerId)
   const { resources } = await container.items
     .query<T>(

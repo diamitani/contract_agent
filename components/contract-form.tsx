@@ -432,7 +432,7 @@ export function ContractForm({
             </form>
 
             {currentChatField >= contract.fields.length && (
-              <div className="mt-4">
+              <form onSubmit={handleFormSubmit} className="mt-4">
                 {renderGenerateButton(true)}
 
                 {showPaymentPrompt && (
@@ -452,7 +452,7 @@ export function ContractForm({
                     </div>
                   </div>
                 )}
-              </div>
+              </form>
             )}
 
             <div className="mt-4 text-center">

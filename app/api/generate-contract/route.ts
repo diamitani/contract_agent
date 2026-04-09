@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server"
-import { callOpenAI, callGeminiDirect } from "@/lib/ai"
+import { callOpenAI, callGeminiDirect, callDeepSeekDirect } from "@/lib/ai"
 
 const ASSISTANT_ID = "asst_z9YqJ8Vb8zaRuv6PXVoiU3UB"
 
@@ -58,8 +58,6 @@ Form Data (use ALL of this information in the contract):
 ${JSON.stringify(fields, null, 2)}
 
 IMPORTANT: Generate the ENTIRE contract with all sections fully written out. Do not summarize or abbreviate any sections. This must be a complete, executable legal document.`
-
-    let useGeminiFallback = false
 
     try {
       // Create a thread
@@ -207,21 +205,19 @@ IMPORTANT: Generate the ENTIRE contract with all sections fully written out. Do 
         },
       })
     } catch (openaiError) {
-      console.log("[v0] OpenAI failed, using Gemini fallback:", openaiError)
-      useGeminiFallback = true
+      console.log("[v0] OpenAI failed, trying DeepSeek fallback:", openaiError)
+      // Continue to fallback chain
     }
 
-    if (useGeminiFallback) {
-      console.log("[v0] Using Gemini fallback for contract generation")
+    // Fallback chain: DeepSeek -> Gemini
+    const encoder = new TextEncoder()
 
-      const encoder = new TextEncoder()
-
-      const stream = new ReadableStream({
-        async start(controller) {
-          try {
-            const geminiContent = await callGeminiDirect({
-              systemPrompt: SYSTEM_INSTRUCTIONS,
-              prompt: `Generate a COMPLETE, FULL-LENGTH legal ${contract_name} document with the following details:
+    const stream = new ReadableStream({
+      async start(controller) {
+        let content = ""
+        let model = "unknown"
+        
+        const generatePrompt = `Generate a COMPLETE, FULL-LENGTH legal ${contract_name} document with the following details:
 
 Contract Type: ${contract_type}
 Contract Name: ${contract_name}
@@ -230,14 +226,49 @@ Generation Date: ${timestamp}
 Form Data (use ALL of this information in the contract):
 ${JSON.stringify(fields, null, 2)}
 
-IMPORTANT: Generate the ENTIRE contract with all sections fully written out. Do not summarize or abbreviate any sections. This must be a complete, executable legal document.`,
-              maxTokens: 8000,
-            })
+IMPORTANT: Generate the ENTIRE contract with all sections fully written out. Do not summarize or abbreviate any sections. This must be a complete, executable legal document.`
 
+        try {
+          // Try DeepSeek first if API key is configured
+          if (process.env.DEEPSEEK_API_KEY) {
+            try {
+              console.log("[v0] Trying DeepSeek for contract generation")
+              content = await callDeepSeekDirect({
+                systemPrompt: SYSTEM_INSTRUCTIONS,
+                prompt: generatePrompt,
+                maxTokens: 8000,
+                temperature: 0.3,
+              })
+              model = "deepseek"
+              console.log("[v0] Contract generated with DeepSeek, length:", content.length)
+            } catch (deepseekError) {
+              console.log("[v0] DeepSeek failed, trying Gemini:", deepseekError)
+              // Continue to Gemini fallback
+            }
+          }
+
+          // If DeepSeek failed or not configured, try Gemini
+          if (!content && process.env.GEMINI_API_KEY) {
+            try {
+              console.log("[v0] Using Gemini fallback for contract generation")
+              content = await callGeminiDirect({
+                systemPrompt: SYSTEM_INSTRUCTIONS,
+                prompt: generatePrompt,
+                maxTokens: 8000,
+              })
+              model = "gemini"
+              console.log("[v0] Contract generated with Gemini, length:", content.length)
+            } catch (geminiError) {
+              console.error("[v0] Gemini error:", geminiError)
+            }
+          }
+
+          // If we have content, stream it
+          if (content) {
             // Send content in chunks for streaming effect
             const chunkSize = 100
-            for (let i = 0; i < geminiContent.length; i += chunkSize) {
-              const chunk = geminiContent.slice(i, i + chunkSize)
+            for (let i = 0; i < content.length; i += chunkSize) {
+              const chunk = content.slice(i, i + chunkSize)
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "delta", content: chunk })}\n\n`))
               // Small delay for streaming effect
               await new Promise((resolve) => setTimeout(resolve, 10))
@@ -247,34 +278,37 @@ IMPORTANT: Generate the ENTIRE contract with all sections fully written out. Do 
               encoder.encode(
                 `data: ${JSON.stringify({
                   type: "complete",
-                  content: geminiContent,
+                  content: content,
                   contractName: contract_name,
                   fields: fields,
-                  model: "gemini",
+                  model: model,
                 })}\n\n`,
               ),
             )
-
-            console.log("[v0] Contract generated with Gemini, length:", geminiContent.length)
-          } catch (error) {
-            console.error("[v0] Gemini error:", error)
+          } else {
+            // All providers failed
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({ type: "error", message: "All AI providers failed" })}\n\n`),
             )
-          } finally {
-            controller.close()
           }
-        },
-      })
+        } catch (error) {
+          console.error("[v0] Contract generation error:", error)
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: "error", message: "All AI providers failed" })}\n\n`),
+          )
+        } finally {
+          controller.close()
+        }
+      },
+    })
 
-      return new Response(stream, {
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
-        },
-      })
-    }
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    })
 
     // This shouldn't be reached, but just in case
     return new Response(JSON.stringify({ error: "Failed to generate contract" }), {

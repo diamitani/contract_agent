@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib"
+import { PDFDocument, rgb, StandardFonts, degrees } from "pdf-lib"
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
           size: watermarkSize,
           font: boldFont,
           color: rgb(0.9, 0.9, 0.9),
-          rotate: { angle: 45, type: "degrees" },
+          rotate: degrees(45),
           opacity: 0.2,
         })
       }
@@ -91,9 +91,9 @@ export async function POST(request: NextRequest) {
               y: pageHeight / 2 + (i * 100) - 100,
               size: watermarkSize,
               font: boldFont,
-              color: rgb(0.9, 0.9, 0.9),
-              rotate: { angle: 45, type: "degrees" },
-              opacity: 0.2,
+                color: rgb(0.9, 0.9, 0.9),
+            rotate: degrees(45),
+                opacity: 0.2,
             })
           }
         }

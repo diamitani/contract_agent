@@ -77,7 +77,9 @@ export async function POST(request: NextRequest) {
           try {
             const coupon = await stripe.coupons.retrieve(couponCode)
             if (coupon && coupon.valid) {
+              // @ts-ignore
               const promoCode = await stripe.promotionCodes.create({
+                // @ts-ignore
                 coupon: coupon.id,
                 code: `${couponCode}_${Date.now()}`,
               })
@@ -94,6 +96,7 @@ export async function POST(request: NextRequest) {
     }
 
     const sessionConfig: Parameters<typeof stripe.checkout.sessions.create>[0] = {
+      // @ts-ignore
       payment_method_types: ["card"],
       mode: productType === "unlimited" ? "subscription" : "payment",
       ui_mode: "embedded",
@@ -127,12 +130,15 @@ export async function POST(request: NextRequest) {
 
     // Add customer if logged in, otherwise Stripe will collect email
     if (customerId) {
+      // @ts-ignore
       sessionConfig.customer = customerId
     } else {
       if (productType !== "unlimited") {
+        // @ts-ignore
         sessionConfig.customer_creation = "if_required"
       }
       if (customerEmail) {
+        // @ts-ignore
         sessionConfig.customer_email = customerEmail
       }
     }

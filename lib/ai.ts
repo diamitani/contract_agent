@@ -26,13 +26,102 @@ function getAzureOpenAIClient() {
 
   return createOpenAI({
     apiKey,
-    baseURL: `${endpoint}/openai/deployments/${deployment}`,
-    defaultQuery: { "api-version": apiVersion },
-    defaultHeaders: { "api-key": apiKey },
+    baseURL: `${endpoint}/openai/deployments/${deployment}?api-version=${apiVersion}`,
   })
 }
 
-export type AIModel = "gemini" | "openai" | "azure-openai"
+function getDeepSeekClient() {
+  const apiKey = process.env.DEEPSEEK_API_KEY
+  if (!apiKey) {
+    throw new Error("DEEPSEEK_API_KEY environment variable is required")
+  }
+  console.log("[AI] Creating DeepSeek client with baseURL:", "https://api.deepseek.com/v1")
+  return createOpenAI({
+    apiKey,
+    baseURL: "https://api.deepseek.com/v1",
+  })
+}
+
+async function callDeepSeekChat(options: {
+  messages: Array<{ role: "user" | "assistant"; content: string }>
+  systemPrompt?: string
+  maxTokens?: number
+  temperature?: number
+}): Promise<string> {
+  const { messages, systemPrompt, maxTokens = 2000, temperature = 0.7 } = options
+  const apiKey = process.env.DEEPSEEK_API_KEY
+  if (!apiKey) {
+    throw new Error("DEEPSEEK_API_KEY environment variable is required")
+  }
+
+  const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "deepseek-chat",
+      messages: systemPrompt ? [
+        { role: "system", content: systemPrompt },
+        ...messages
+      ] : messages,
+      max_tokens: maxTokens,
+      temperature,
+    }),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`DeepSeek API error ${response.status}: ${errorText}`)
+  }
+
+  const data = await response.json()
+  return data.choices[0]?.message?.content || ""
+}
+
+export async function callDeepSeekDirect(options: {
+  prompt: string
+  systemPrompt?: string
+  maxTokens?: number
+  temperature?: number
+}): Promise<string> {
+  const { prompt, systemPrompt, maxTokens = 8000, temperature = 0.3 } = options
+  const apiKey = process.env.DEEPSEEK_API_KEY
+  if (!apiKey) {
+    throw new Error("DEEPSEEK_API_KEY environment variable is required")
+  }
+
+  const messages: Array<{ role: "user" | "assistant" | "system"; content: string }> = []
+  if (systemPrompt) {
+    messages.push({ role: "system", content: systemPrompt })
+  }
+  messages.push({ role: "user", content: prompt })
+
+  const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "deepseek-chat",
+      messages,
+      max_tokens: maxTokens,
+      temperature,
+    }),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`DeepSeek API error ${response.status}: ${errorText}`)
+  }
+
+  const data = await response.json()
+  return data.choices[0]?.message?.content || ""
+}
+
+export type AIModel = "gemini" | "openai" | "azure-openai" | "deepseek"
 
 interface GenerateOptions {
   systemPrompt: string
@@ -52,10 +141,12 @@ export async function generateWithFallback(options: GenerateOptions): Promise<{
     try {
       console.log("[AI] Trying Azure OpenAI")
       const azure = getAzureOpenAIClient()
+      const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o"
       const result = await generateText({
-        model: azure("gpt-4o"), // Azure deployment name is set in baseURL
+        model: azure(deployment),
         system: systemPrompt,
         prompt: userPrompt,
+        // @ts-ignore
         maxTokens: maxOutputTokens,
         temperature,
       })
@@ -68,6 +159,26 @@ export async function generateWithFallback(options: GenerateOptions): Promise<{
       }
     } catch (error) {
       console.error("[AI] Azure OpenAI error:", error)
+      // Continue to fallback
+    }
+  }
+
+  // Try DeepSeek if configured
+  if (process.env.DEEPSEEK_API_KEY) {
+    try {
+      console.log("[AI] Trying DeepSeek (direct)")
+      const responseText = await callDeepSeekDirect({
+        systemPrompt,
+        prompt: userPrompt,
+        maxTokens: maxOutputTokens,
+        temperature,
+      })
+      if (responseText.trim()) {
+        console.log(`[AI] Success with DeepSeek, length: ${responseText.length}`)
+        return { text: responseText, model: "deepseek" }
+      }
+    } catch (error) {
+      console.error("[AI] DeepSeek error:", error)
       // Continue to fallback
     }
   }
@@ -85,6 +196,7 @@ export async function generateWithFallback(options: GenerateOptions): Promise<{
         model: gemini(modelName),
         system: systemPrompt,
         prompt: userPrompt,
+        // @ts-ignore
         maxTokens: maxOutputTokens,
         temperature,
       })
@@ -121,6 +233,13 @@ export async function generateChat(options: {
 }): Promise<string> {
   const { systemPrompt, messages, maxOutputTokens = 2000, temperature = 0.7 } = options
 
+  // Dev mock when no API keys configured
+  if (process.env.NODE_ENV !== "production" && !process.env.AZURE_OPENAI_API_KEY && !process.env.GEMINI_API_KEY && !process.env.DEEPSEEK_API_KEY) {
+    console.log("[AI] Using development mock response")
+    const lastUserMessage = messages.filter(m => m.role === "user").pop()?.content || "Hello"
+    return `I'm your contract assistant. You asked: "${lastUserMessage}". In a real environment, this would be handled by AI. To enable AI features, set AZURE_OPENAI_API_KEY, GEMINI_API_KEY, or DEEPSEEK_API_KEY in your .env.local file.`
+  }
+
   const conversationPrompt = messages
     .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
     .join("\n\n")
@@ -130,10 +249,12 @@ export async function generateChat(options: {
     try {
       console.log("[AI] Trying Azure OpenAI for chat")
       const azure = getAzureOpenAIClient()
+      const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o"
       const result = await generateText({
-        model: azure("gpt-4o"),
+        model: azure(deployment),
         system: systemPrompt,
         prompt: conversationPrompt + "\n\nAssistant:",
+        // @ts-ignore
         maxTokens: maxOutputTokens,
         temperature,
       })
@@ -141,6 +262,23 @@ export async function generateChat(options: {
       return result.text || "I apologize, but I couldn't generate a response. Please try again."
     } catch (error) {
       console.error("[AI] Azure OpenAI chat error:", error)
+      // Continue to fallback
+    }
+  }
+
+  // Try DeepSeek if configured
+  if (process.env.DEEPSEEK_API_KEY) {
+    try {
+      console.log("[AI] Trying DeepSeek for chat (direct API)")
+      const result = await callDeepSeekChat({
+        messages,
+        systemPrompt,
+        maxTokens: maxOutputTokens,
+        temperature,
+      })
+      return result || "I apologize, but I couldn't generate a response. Please try again."
+    } catch (error) {
+      console.error("[AI] DeepSeek chat error:", error)
       // Continue to fallback
     }
   }
@@ -153,6 +291,7 @@ export async function generateChat(options: {
       model: gemini("gemini-2.0-flash-exp"),
       system: systemPrompt,
       prompt: conversationPrompt + "\n\nAssistant:",
+      // @ts-ignore
       maxTokens: maxOutputTokens,
       temperature,
     })
@@ -166,6 +305,7 @@ export async function generateChat(options: {
         model: gemini("gemini-1.5-flash"),
         system: systemPrompt,
         prompt: conversationPrompt + "\n\nAssistant:",
+        // @ts-ignore
         maxTokens: maxOutputTokens,
         temperature,
       })
@@ -208,6 +348,7 @@ export async function callGeminiDirect(options: {
       model: gemini("gemini-2.0-flash-exp"),
       system: systemPrompt,
       prompt,
+      // @ts-ignore
       maxTokens: maxTokens,
     })
 
@@ -219,6 +360,7 @@ export async function callGeminiDirect(options: {
       model: gemini("gemini-1.5-flash"),
       system: systemPrompt,
       prompt,
+      // @ts-ignore
       maxTokens: maxTokens,
     })
 

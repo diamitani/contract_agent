@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Upload, FileText, X, Loader2 } from "lucide-react"
 import { saveUploadedFile, type UploadedFile } from "@/lib/contract-store"
+import { APP_ID } from "@/lib/constants"
 
 interface ContractUploadProps {
   onUpload: (file: UploadedFile) => void
@@ -83,6 +84,7 @@ export function ContractUpload({ onUpload }: ContractUploadProps) {
         file_size: selectedFile.size,
         storage_path: fileUrl,
         extracted_text: extractedText, // Save extracted text
+        app_id: APP_ID,
       })
 
       if (uploadedFile) {
