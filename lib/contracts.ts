@@ -8,6 +8,36 @@ export interface ContractTemplate {
   pdfUrl: string
 }
 
+// Category images mapping with beautiful stock photos
+export const categoryImages: Record<string, string> = {
+  Marketing: "https://images.unsplash.com/photo-1557838923-2985c318be48?w=800&h=600&fit=crop",
+  Production: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800&h=600&fit=crop",
+  Management: "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=800&h=600&fit=crop",
+  Recording: "https://images.unsplash.com/photo-1598653222000-6b7b7a552625?w=800&h=600&fit=crop",
+  Sponsorship: "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=800&h=600&fit=crop",
+  Performance: "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=800&h=600&fit=crop",
+  Collaboration: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&h=600&fit=crop",
+  Licensing: "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800&h=600&fit=crop",
+  Representation: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=800&h=600&fit=crop",
+  Business: "https://images.unsplash.com/photo-1664575602554-2087b04935a5?w=800&h=600&fit=crop",
+  Release: "https://images.unsplash.com/photo-1571171637578-41bc2dd41cd2?w=800&h=600&fit=crop",
+}
+
+// Category gradient colors for enhanced visual appeal
+export const categoryColors: Record<string, { from: string; to: string }> = {
+  Marketing: { from: "#FF6B6B", to: "#FF8E53" },
+  Production: { from: "#4ECDC4", to: "#44A08D" },
+  Management: { from: "#A8E6CF", to: "#3BB78F" },
+  Recording: { from: "#C471ED", to: "#F64F59" },
+  Sponsorship: { from: "#FFA07A", to: "#FF6347" },
+  Performance: { from: "#667EEA", to: "#764BA2" },
+  Collaboration: { from: "#FFD89B", to: "#FF6B6B" },
+  Licensing: { from: "#89CFF0", to: "#4A90E2" },
+  Representation: { from: "#48C6EF", to: "#6F86D6" },
+  Business: { from: "#5E60CE", to: "#7B2CBF" },
+  Release: { from: "#FF6B9D", to: "#C239B3" },
+}
+
 export interface ContractField {
   id: string
   name: string

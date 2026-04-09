@@ -13,7 +13,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Search, FileText, Download, Eye, CheckCircle, Mail, ArrowRight, Sparkles, Loader2 } from "lucide-react"
+import { categoryImages, categoryColors } from "@/lib/contracts"
 import type { ContractTemplate } from "@/lib/contracts"
+import Image from "next/image"
 
 export default function TemplatesPage() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -260,55 +262,89 @@ Date                                       Date`,
     <div className="min-h-screen bg-background">
       <Header />
 
-      {/* Hero Section */}
-      <section className="border-b border-border bg-gradient-to-b from-primary/5 to-transparent">
-        <div className="container mx-auto px-4 py-12 text-center">
-          <div className="inline-flex items-center gap-2 bg-chart-5/10 text-chart-5 px-4 py-2 rounded-full mb-6">
-            <Download className="w-4 h-4" />
-            <span className="text-sm font-medium">Free Contract Templates</span>
+      {/* Premium Hero Section */}
+      <section className="relative border-b border-border overflow-hidden">
+        {/* Background Elements */}
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-chart-5/5 to-transparent" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(120,119,198,0.1),transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(255,107,107,0.08),transparent_50%)]" />
+
+        <div className="relative container mx-auto px-4 py-16 md:py-24 text-center">
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-chart-5/20 to-primary/20 backdrop-blur-sm border border-chart-5/30 text-chart-5 px-5 py-2.5 rounded-full mb-8 shadow-lg">
+            <Sparkles className="w-4 h-4" />
+            <span className="text-sm font-semibold">Premium Contract Library</span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-            Download Professional Contract Templates
+
+          {/* Main Heading */}
+          <h1 className="text-4xl md:text-6xl font-bold text-foreground mb-6 tracking-tight">
+            Professional Contract
+            <br />
+            <span className="bg-gradient-to-r from-primary via-chart-5 to-primary bg-clip-text text-transparent">
+              Templates for Artists
+            </span>
           </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Access our library of {contractTemplates.length}+ industry-standard contract templates. Download for free
-            with just your name and email.
+
+          {/* Description */}
+          <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed mb-8">
+            Access our curated library of <span className="font-semibold text-foreground">{contractTemplates.length}+</span> industry-standard
+            legal contracts. Trusted by thousands of artists, producers, and creative professionals worldwide.
           </p>
+
+          {/* Stats */}
+          <div className="flex flex-wrap items-center justify-center gap-8 text-sm">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-chart-5" />
+              <span className="text-muted-foreground">Industry Standard</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-chart-5" />
+              <span className="text-muted-foreground">Instant Download</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-chart-5" />
+              <span className="text-muted-foreground">Free to Use</span>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Filters Section */}
-      <section className="container mx-auto px-4 py-8">
-        <div className="flex flex-col md:flex-row gap-4 mb-8">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-            <Input
-              placeholder="Search templates..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-input border-border"
-            />
+      {/* Enhanced Filters Section */}
+      <section className="container mx-auto px-4 py-10">
+        <div className="bg-card/50 backdrop-blur-sm border border-border rounded-2xl p-6 shadow-lg mb-10">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <Input
+                placeholder="Search by contract name or description..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-12 h-12 bg-background/50 border-border focus:ring-2 focus:ring-primary/20 text-base"
+              />
+            </div>
           </div>
-          <div className="flex gap-2 flex-wrap">
+
+          {/* Category Pills */}
+          <div className="flex gap-2 flex-wrap mt-4 pt-4 border-t border-border">
             <Badge
               variant={selectedCategory === null ? "default" : "outline"}
-              className={`cursor-pointer ${
+              className={`cursor-pointer px-4 py-2 text-sm font-medium transition-all ${
                 selectedCategory === null
-                  ? "bg-primary text-primary-foreground"
-                  : "border-border text-foreground hover:bg-secondary"
+                  ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30"
+                  : "border-border text-foreground hover:bg-secondary hover:scale-105"
               }`}
               onClick={() => setSelectedCategory(null)}
             >
-              All
+              All Templates
             </Badge>
             {categories.map((category) => (
               <Badge
                 key={category}
                 variant={selectedCategory === category ? "default" : "outline"}
-                className={`cursor-pointer ${
+                className={`cursor-pointer px-4 py-2 text-sm font-medium transition-all ${
                   selectedCategory === category
-                    ? "bg-primary text-primary-foreground"
-                    : "border-border text-foreground hover:bg-secondary"
+                    ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30"
+                    : "border-border text-foreground hover:bg-secondary hover:scale-105"
                 }`}
                 onClick={() => setSelectedCategory(category)}
               >
@@ -318,49 +354,95 @@ Date                                       Date`,
           </div>
         </div>
 
-        {/* Templates Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredContracts.map((contract) => (
-            <Card key={contract.id} className="bg-card border-border hover:border-primary/50 transition-all group">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-3">
-                    <FileText className="w-5 h-5 text-primary" />
+        {/* Results Count */}
+        <div className="flex items-center justify-between mb-6">
+          <p className="text-sm text-muted-foreground">
+            Showing <span className="font-semibold text-foreground">{filteredContracts.length}</span> contract
+            {filteredContracts.length !== 1 ? "s" : ""}
+          </p>
+        </div>
+
+        {/* Premium Templates Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {filteredContracts.map((contract, index) => {
+            const categoryImage = categoryImages[contract.category]
+            const categoryColor = categoryColors[contract.category] || { from: "#667EEA", to: "#764BA2" }
+
+            return (
+              <div
+                key={contract.id}
+                className="animate-in fade-in-50 slide-in-from-bottom-4"
+                style={{
+                  animationDelay: `${index * 50}ms`,
+                  animationFillMode: "backwards",
+                }}
+              >
+                <Card className="bg-card border-border hover:border-primary/50 transition-all group overflow-hidden hover:shadow-2xl hover:shadow-primary/10 h-full">
+                  <CardHeader className="p-0">
+                    {/* Beautiful Category Image with actual photo */}
+                    <div className="relative h-48 w-full overflow-hidden">
+                      <div
+                        className="absolute inset-0 opacity-90"
+                        style={{
+                          background: `linear-gradient(135deg, ${categoryColor.from}, ${categoryColor.to})`,
+                        }}
+                      />
+                      {categoryImage && (
+                        <Image
+                          src={categoryImage}
+                          alt={contract.category}
+                          fill
+                          className="object-cover mix-blend-overlay opacity-60 group-hover:scale-110 transition-transform duration-500"
+                          unoptimized
+                        />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+                      <div className="absolute top-4 right-4 z-10 flex gap-2">
+                        <Badge variant="secondary" className="bg-white/95 backdrop-blur-sm text-gray-900 border-0 shadow-lg font-semibold">
+                          {contract.category}
+                        </Badge>
+                        <Badge variant="outline" className="bg-chart-5/95 backdrop-blur-sm text-white border-0 shadow-lg font-semibold">
+                          Free
+                        </Badge>
+                      </div>
+                      <div className="absolute bottom-4 left-4 z-10">
+                        <div className="w-12 h-12 rounded-xl bg-white/95 backdrop-blur-sm flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                          <FileText className="w-6 h-6 text-gray-900" />
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <div className="p-6">
+                    <CardTitle className="text-lg group-hover:text-primary transition-colors mb-2 flex items-center gap-2">
+                      {contract.name}
+                      <Sparkles className="w-4 h-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </CardTitle>
+                    <CardDescription className="line-clamp-2 mb-4">{contract.description}</CardDescription>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+                      <span className="font-medium">{contract.fields.length} fields</span>
+                      <span>•</span>
+                      <span>TXT format</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 bg-transparent"
+                        onClick={() => handlePreviewClick(contract)}
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        Preview
+                      </Button>
+                      <Button size="sm" className="flex-1 shadow-lg shadow-primary/20" onClick={() => handleDownloadClick(contract)}>
+                        <Download className="w-4 h-4 mr-2" />
+                        Download
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">{contract.category}</Badge>
-                    <Badge variant="outline" className="bg-chart-5/10 text-chart-5 border-chart-5/20">
-                      Free
-                    </Badge>
-                  </div>
-                </div>
-                <CardTitle className="text-lg group-hover:text-primary transition-colors">{contract.name}</CardTitle>
-                <CardDescription className="line-clamp-2">{contract.description}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-                  <span>{contract.fields.length} fields</span>
-                  <span>•</span>
-                  <span>TXT format</span>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 bg-transparent"
-                    onClick={() => handlePreviewClick(contract)}
-                  >
-                    <Eye className="w-4 h-4 mr-2" />
-                    Preview
-                  </Button>
-                  <Button size="sm" className="flex-1" onClick={() => handleDownloadClick(contract)}>
-                    <Download className="w-4 h-4 mr-2" />
-                    Download
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </Card>
+              </div>
+            )
+          })}
         </div>
 
         {filteredContracts.length === 0 && (
@@ -372,18 +454,50 @@ Date                                       Date`,
         )}
       </section>
 
-      {/* CTA Section */}
-      <section className="border-t border-border bg-card/50">
-        <div className="container mx-auto px-4 py-12 text-center">
-          <Sparkles className="w-8 h-8 text-primary mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-foreground mb-2">Need a Customized Contract?</h2>
-          <p className="text-muted-foreground mb-6 max-w-xl mx-auto">
-            Use our AI-powered contract generator to create fully customized contracts tailored to your specific needs.
+      {/* Premium CTA Section */}
+      <section className="relative border-t border-border overflow-hidden">
+        {/* Background Effects */}
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-chart-5/5 to-transparent" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(120,119,198,0.15),transparent_70%)]" />
+
+        <div className="relative container mx-auto px-4 py-20 text-center">
+          {/* Icon */}
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-chart-5 shadow-xl shadow-primary/30 mb-6">
+            <Sparkles className="w-8 h-8 text-white" />
+          </div>
+
+          {/* Heading */}
+          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+            Need a Customized Contract?
+          </h2>
+
+          {/* Description */}
+          <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed">
+            Use our <span className="font-semibold text-foreground">AI-powered contract generator</span> to create
+            fully customized, legally sound contracts tailored to your specific needs in minutes.
           </p>
-          <Button asChild size="lg">
+
+          {/* Features */}
+          <div className="flex flex-wrap items-center justify-center gap-6 mb-10 text-sm">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-chart-5" />
+              <span className="text-muted-foreground">AI-Powered Generation</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-chart-5" />
+              <span className="text-muted-foreground">Legally Reviewed</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-chart-5" />
+              <span className="text-muted-foreground">Ready in Minutes</span>
+            </div>
+          </div>
+
+          {/* CTA Button */}
+          <Button asChild size="lg" className="text-base px-8 py-6 shadow-2xl shadow-primary/30 hover:shadow-primary/40 transition-all">
             <a href="/">
               Generate Custom Contract
-              <ArrowRight className="w-4 h-4 ml-2" />
+              <ArrowRight className="w-5 h-5 ml-2" />
             </a>
           </Button>
         </div>
