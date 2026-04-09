@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { StripePortalButton } from "@/components/stripe-portal-button"
 import { User, Mail, Calendar, Crown, Zap, FileText, CreditCard, ArrowRight } from "lucide-react"
 import Link from "next/link"
 import { getCurrentUser } from "@/lib/auth/current-user"
@@ -167,14 +168,19 @@ export default async function ProfilePage() {
                       </p>
                     </div>
                   </div>
-                  {profile?.subscription_status !== "unlimited" && (
-                    <Button asChild size="sm" className="bg-primary hover:bg-primary/90">
-                      <Link href="/checkout/unlimited">
-                        Upgrade
-                        <ArrowRight className="w-4 h-4 ml-1" />
-                      </Link>
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {profile?.stripe_customer_id && (
+                      <StripePortalButton />
+                    )}
+                    {profile?.subscription_status !== "unlimited" && (
+                      <Button asChild size="sm" className="bg-primary hover:bg-primary/90">
+                        <Link href="/checkout/unlimited">
+                          Upgrade
+                          <ArrowRight className="w-4 h-4 ml-1" />
+                        </Link>
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             </CardContent>
