@@ -4,6 +4,20 @@ import { createOpenAI } from "@ai-sdk/openai"
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || ""
 
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || ""
+const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1"
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "qwen2.5-coder:14b"
+
+function getOpenRouterClient() {
+  if (!OPENROUTER_API_KEY) {
+    throw new Error("OPENROUTER_API_KEY environment variable is required")
+  }
+  return createOpenAI({
+    apiKey: OPENROUTER_API_KEY,
+    baseURL: OPENROUTER_BASE_URL,
+  })
+}
+
 function getGeminiClient() {
   const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || GEMINI_API_KEY
 
@@ -121,7 +135,7 @@ export async function callDeepSeekDirect(options: {
   return data.choices[0]?.message?.content || ""
 }
 
-export type AIModel = "gemini" | "openai" | "azure-openai" | "deepseek"
+export type AIModel = "gemini" | "openai" | "azure-openai" | "deepseek" | "openrouter"
 
 interface GenerateOptions {
   systemPrompt: string
@@ -180,6 +194,30 @@ export async function generateWithFallback(options: GenerateOptions): Promise<{
     } catch (error) {
       console.error("[AI] DeepSeek error:", error)
       // Continue to fallback
+    }
+  }
+
+  // Try OpenRouter if configured
+  if (OPENROUTER_API_KEY) {
+    try {
+      console.log("[AI] Trying OpenRouter")
+      const openrouter = getOpenRouterClient()
+      const result = await generateText({
+        model: openrouter(OPENROUTER_MODEL),
+        system: systemPrompt,
+        prompt: userPrompt,
+        // @ts-ignore
+        maxTokens: maxOutputTokens,
+        temperature,
+      })
+
+      const responseText = result.text || ""
+      if (responseText.trim()) {
+        console.log(`[AI] Success with OpenRouter, length: ${responseText.length}`)
+        return { text: responseText, model: "openrouter" }
+      }
+    } catch (error) {
+      console.error("[AI] OpenRouter error:", error)
     }
   }
 
@@ -283,6 +321,25 @@ export async function generateChat(options: {
     }
   }
 
+  // Try OpenRouter if configured
+  if (OPENROUTER_API_KEY) {
+    try {
+      console.log("[AI] Trying OpenRouter for chat")
+      const openrouter = getOpenRouterClient()
+      const result = await generateText({
+        model: openrouter(OPENROUTER_MODEL),
+        system: systemPrompt,
+        prompt: conversationPrompt + "\n\nAssistant:",
+        // @ts-ignore
+        maxTokens: maxOutputTokens,
+        temperature,
+      })
+      return result.text || "I apologize, but I couldn't generate a response. Please try again."
+    } catch (error) {
+      console.error("[AI] OpenRouter chat error:", error)
+    }
+  }
+
   // Fallback to Gemini
   const gemini = getGeminiClient()
 
@@ -315,6 +372,48 @@ export async function generateChat(options: {
       throw new Error(error instanceof Error ? error.message : "Failed to generate chat response")
     }
   }
+}
+
+export async function callOpenRouterDirect(options: {
+  prompt: string
+  systemPrompt?: string
+  maxTokens?: number
+  temperature?: number
+}): Promise<string> {
+  const { prompt, systemPrompt, maxTokens = 8000, temperature = 0.3 } = options
+  if (!OPENROUTER_API_KEY) {
+    throw new Error("OPENROUTER_API_KEY environment variable is required")
+  }
+
+  const messages: Array<{ role: string; content: string }> = []
+  if (systemPrompt) {
+    messages.push({ role: "system", content: systemPrompt })
+  }
+  messages.push({ role: "user", content: prompt })
+
+  const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+      "HTTP-Referer": "https://artispreneur.com",
+      "X-Title": "Artispreneur Contract Generator",
+    },
+    body: JSON.stringify({
+      model: OPENROUTER_MODEL,
+      messages,
+      max_tokens: maxTokens,
+      temperature,
+    }),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`OpenRouter API error ${response.status}: ${errorText}`)
+  }
+
+  const data = await response.json()
+  return data.choices[0]?.message?.content || ""
 }
 
 export async function callOpenAI(endpoint: string, options: RequestInit): Promise<Response> {
