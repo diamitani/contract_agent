@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server"
-import { callOpenAI, callGeminiDirect, callDeepSeekDirect } from "@/lib/ai"
+import { callOpenAI, callGeminiDirect, callDeepSeekDirect, callOpenRouterDirect } from "@/lib/ai"
 
 const ASSISTANT_ID = "asst_z9YqJ8Vb8zaRuv6PXVoiU3UB"
 
@@ -23,7 +23,6 @@ IMPORTANT REQUIREMENTS:
    - Force Majeure
    - General Provisions (Entire Agreement, Amendment, Waiver, Severability, Assignment, Notices, Governing Law)
    - Signature Blocks
-
 3. Use proper legal language and formatting
 4. Fill in ALL provided information from the form data
 5. Use [BLANK] or [TO BE COMPLETED] only for information not provided
@@ -32,294 +31,126 @@ IMPORTANT REQUIREMENTS:
 8. Include specific dates, amounts, and parties as provided
 9. Do NOT abbreviate or summarize - provide the full legal text`
 
+const encoder = new TextEncoder()
+
+function buildGeneratePrompt(contractName: string, contractType: string, timestamp: string, fields: Record<string, string>) {
+  return `Generate a COMPLETE, FULL-LENGTH legal ${contractName} document with the following details:
+
+Contract Type: ${contractType}
+Contract Name: ${contractName}
+Generation Date: ${timestamp}
+
+Form Data (use ALL of this information in the contract):
+${JSON.stringify(fields, null, 2)}
+
+IMPORTANT: Generate the ENTIRE contract with all sections fully written out. Do not summarize or abbreviate any sections. This must be a complete, executable legal document.`
+}
+
+async function tryDeepSeek(prompt: string) {
+  if (!process.env.DEEPSEEK_API_KEY) return ""
+  console.log("[gen] Trying DeepSeek for contract generation")
+  try {
+    const content = await callDeepSeekDirect({ systemPrompt: SYSTEM_INSTRUCTIONS, prompt, maxTokens: 8000, temperature: 0.3 })
+    if (content.trim()) {
+      console.log("[gen] DeepSeek success, length:", content.length)
+      return content
+    }
+  } catch (e) {
+    console.log("[gen] DeepSeek failed:", e)
+  }
+  return ""
+}
+
+async function tryOpenRouter(prompt: string) {
+  if (!process.env.OPENROUTER_API_KEY) return ""
+  console.log("[gen] Trying OpenRouter for contract generation")
+  try {
+    const content = await callOpenRouterDirect({ systemPrompt: SYSTEM_INSTRUCTIONS, prompt, maxTokens: 8000, temperature: 0.3 })
+    if (content.trim()) {
+      console.log("[gen] OpenRouter success, length:", content.length)
+      return content
+    }
+  } catch (e) {
+    console.log("[gen] OpenRouter failed:", e)
+  }
+  return ""
+}
+
+async function tryGemini(prompt: string) {
+  if (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_GENERATIVE_AI_API_KEY) return ""
+  console.log("[gen] Trying Gemini for contract generation")
+  try {
+    const content = await callGeminiDirect({ systemPrompt: SYSTEM_INSTRUCTIONS, prompt, maxTokens: 8000 })
+    if (content.trim()) {
+      console.log("[gen] Gemini success, length:", content.length)
+      return content
+    }
+  } catch (e) {
+    console.log("[gen] Gemini failed:", e)
+  }
+  return ""
+}
+
+function streamContract(controller: ReadableStreamDefaultController, content: string, model: string, contractName: string, fields: Record<string, string>) {
+  const chunkSize = 100
+  for (let i = 0; i < content.length; i += chunkSize) {
+    const chunk = content.slice(i, i + chunkSize)
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "delta", content: chunk })}\n\n`))
+  }
+  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "complete", content, contractName, fields, model })}\n\n`))
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { contract_type, contract_name, fields, timestamp } = body
+    const { contract_type, contract_name, fields, timestamp, model: preferredModel } = body
 
-    console.log("[v0] Contract generation request:", {
-      contract_type,
-      contract_name,
-      timestamp,
-      fieldCount: Object.keys(fields).length,
-    })
+    console.log("[gen] Request:", { contract_type, contract_name, preferredModel, fieldCount: Object.keys(fields).length })
 
-    const messageContent = `${SYSTEM_INSTRUCTIONS}
+    const prompt = buildGeneratePrompt(contract_name, contract_type, timestamp, fields)
 
----
-
-Generate a COMPLETE, FULL-LENGTH legal ${contract_name} document with the following details:
-
-Contract Type: ${contract_type}
-Contract Name: ${contract_name}
-Generation Date: ${timestamp}
-
-Form Data (use ALL of this information in the contract):
-${JSON.stringify(fields, null, 2)}
-
-IMPORTANT: Generate the ENTIRE contract with all sections fully written out. Do not summarize or abbreviate any sections. This must be a complete, executable legal document.`
-
-    try {
-      // Create a thread
-      const threadResponse = await callOpenAI("/threads", {
-        method: "POST",
-        headers: { "OpenAI-Beta": "assistants=v2" },
-      })
-
-      if (!threadResponse.ok) {
-        throw new Error("Failed to create thread")
+    // If a specific model was requested, try it directly
+    if (preferredModel === "deepseek") {
+      const content = await tryDeepSeek(prompt)
+      if (content) {
+        const stream = new ReadableStream({ start(controller) { streamContract(controller, content, "deepseek", contract_name, fields); controller.close() } })
+        return new Response(stream, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" } })
       }
-
-      const thread = await threadResponse.json()
-      console.log("[v0] Thread created:", thread.id)
-
-      // Add message to thread
-      const messageResponse = await callOpenAI(`/threads/${thread.id}/messages`, {
-        method: "POST",
-        headers: { "OpenAI-Beta": "assistants=v2" },
-        body: JSON.stringify({
-          role: "user",
-          content: messageContent,
-        }),
-      })
-
-      if (!messageResponse.ok) {
-        throw new Error("Failed to add message to thread")
-      }
-
-      console.log("[v0] Message added to thread")
-
-      // Run the assistant with streaming
-      const runResponse = await callOpenAI(`/threads/${thread.id}/runs`, {
-        method: "POST",
-        headers: { "OpenAI-Beta": "assistants=v2" },
-        body: JSON.stringify({
-          assistant_id: ASSISTANT_ID,
-          stream: true,
-        }),
-      })
-
-      if (!runResponse.ok) {
-        throw new Error("Failed to run assistant")
-      }
-
-      const encoder = new TextEncoder()
-
-      const stream = new ReadableStream({
-        async start(controller) {
-          const reader = runResponse.body?.getReader()
-          if (!reader) {
-            controller.close()
-            return
-          }
-
-          const decoder = new TextDecoder()
-          let buffer = ""
-          let fullContent = ""
-          let runCompleted = false
-
-          try {
-            while (true) {
-              const { done, value } = await reader.read()
-              if (done) break
-
-              buffer += decoder.decode(value, { stream: true })
-              const lines = buffer.split("\n")
-              buffer = lines.pop() || ""
-
-              for (const line of lines) {
-                if (line.startsWith("data: ")) {
-                  const data = line.slice(6).trim()
-                  if (data === "[DONE]") {
-                    runCompleted = true
-                    continue
-                  }
-
-                  try {
-                    const parsed = JSON.parse(data)
-
-                    if (parsed.object === "thread.message.delta") {
-                      const delta = parsed.delta?.content?.[0]?.text?.value
-                      if (delta) {
-                        fullContent += delta
-                        controller.enqueue(
-                          encoder.encode(`data: ${JSON.stringify({ type: "delta", content: delta })}\n\n`),
-                        )
-                      }
-                    }
-
-                    if (parsed.object === "thread.run" && parsed.status === "completed") {
-                      runCompleted = true
-                    }
-                  } catch {
-                    // Skip non-JSON lines
-                  }
-                }
-              }
-            }
-
-            // Fetch final message if needed
-            if (!fullContent && runCompleted) {
-              const messagesResponse = await callOpenAI(`/threads/${thread.id}/messages`, {
-                headers: { "OpenAI-Beta": "assistants=v2" },
-              })
-
-              const messagesData = await messagesResponse.json()
-              const assistantMessage = messagesData.data?.find((msg: { role: string }) => msg.role === "assistant")
-
-              if (assistantMessage?.content?.[0]?.text?.value) {
-                fullContent = assistantMessage.content[0].text.value
-                controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify({ type: "delta", content: fullContent })}\n\n`),
-                )
-              }
-            }
-
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({
-                  type: "complete",
-                  content: fullContent,
-                  contractName: contract_name,
-                  fields: fields,
-                  model: "openai",
-                })}\n\n`,
-              ),
-            )
-
-            console.log("[v0] Contract generated with OpenAI, length:", fullContent.length)
-          } catch (error) {
-            console.error("[v0] OpenAI stream error:", error)
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "error", message: String(error) })}\n\n`))
-          } finally {
-            controller.close()
-          }
-        },
-      })
-
-      return new Response(stream, {
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
-        },
-      })
-    } catch (openaiError) {
-      console.log("[v0] OpenAI failed, trying DeepSeek fallback:", openaiError)
-      // Continue to fallback chain
     }
 
-    // Fallback chain: DeepSeek -> Gemini
-    const encoder = new TextEncoder()
+    if (preferredModel === "openrouter") {
+      const content = await tryOpenRouter(prompt)
+      if (content) {
+        const stream = new ReadableStream({ start(controller) { streamContract(controller, content, "openrouter", contract_name, fields); controller.close() } })
+        return new Response(stream, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" } })
+      }
+    }
 
-    const stream = new ReadableStream({
-      async start(controller) {
-        let content = ""
-        let model = "unknown"
-        
-        const generatePrompt = `Generate a COMPLETE, FULL-LENGTH legal ${contract_name} document with the following details:
+    // Fallback chain: DeepSeek → OpenRouter → Gemini
+    let content = ""
+    let model = "unknown"
 
-Contract Type: ${contract_type}
-Contract Name: ${contract_name}
-Generation Date: ${timestamp}
+    content = await tryDeepSeek(prompt)
+    if (content) { model = "deepseek" }
 
-Form Data (use ALL of this information in the contract):
-${JSON.stringify(fields, null, 2)}
+    if (!content) {
+      content = await tryOpenRouter(prompt)
+      if (content) { model = "openrouter" }
+    }
 
-IMPORTANT: Generate the ENTIRE contract with all sections fully written out. Do not summarize or abbreviate any sections. This must be a complete, executable legal document.`
+    if (!content) {
+      content = await tryGemini(prompt)
+      if (content) { model = "gemini" }
+    }
 
-        try {
-          // Try DeepSeek first if API key is configured
-          if (process.env.DEEPSEEK_API_KEY) {
-            try {
-              console.log("[v0] Trying DeepSeek for contract generation")
-              content = await callDeepSeekDirect({
-                systemPrompt: SYSTEM_INSTRUCTIONS,
-                prompt: generatePrompt,
-                maxTokens: 8000,
-                temperature: 0.3,
-              })
-              model = "deepseek"
-              console.log("[v0] Contract generated with DeepSeek, length:", content.length)
-            } catch (deepseekError) {
-              console.log("[v0] DeepSeek failed, trying Gemini:", deepseekError)
-              // Continue to Gemini fallback
-            }
-          }
+    if (!content) {
+      return new Response(JSON.stringify({ error: "All AI providers failed" }), { status: 500, headers: { "Content-Type": "application/json" } })
+    }
 
-          // If DeepSeek failed or not configured, try Gemini
-          if (!content && process.env.GEMINI_API_KEY) {
-            try {
-              console.log("[v0] Using Gemini fallback for contract generation")
-              content = await callGeminiDirect({
-                systemPrompt: SYSTEM_INSTRUCTIONS,
-                prompt: generatePrompt,
-                maxTokens: 8000,
-              })
-              model = "gemini"
-              console.log("[v0] Contract generated with Gemini, length:", content.length)
-            } catch (geminiError) {
-              console.error("[v0] Gemini error:", geminiError)
-            }
-          }
-
-          // If we have content, stream it
-          if (content) {
-            // Send content in chunks for streaming effect
-            const chunkSize = 100
-            for (let i = 0; i < content.length; i += chunkSize) {
-              const chunk = content.slice(i, i + chunkSize)
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "delta", content: chunk })}\n\n`))
-              // Small delay for streaming effect
-              await new Promise((resolve) => setTimeout(resolve, 10))
-            }
-
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({
-                  type: "complete",
-                  content: content,
-                  contractName: contract_name,
-                  fields: fields,
-                  model: model,
-                })}\n\n`,
-              ),
-            )
-          } else {
-            // All providers failed
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ type: "error", message: "All AI providers failed" })}\n\n`),
-            )
-          }
-        } catch (error) {
-          console.error("[v0] Contract generation error:", error)
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: "error", message: "All AI providers failed" })}\n\n`),
-          )
-        } finally {
-          controller.close()
-        }
-      },
-    })
-
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
-    })
-
-    // This shouldn't be reached, but just in case
-    return new Response(JSON.stringify({ error: "Failed to generate contract" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    })
+    const stream = new ReadableStream({ start(controller) { streamContract(controller, content, model, contract_name, fields); controller.close() } })
+    return new Response(stream, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" } })
   } catch (error) {
-    console.error("[v0] API error:", error)
-    return new Response(JSON.stringify({ error: "Failed to generate contract", details: String(error) }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    })
+    console.error("[gen] API error:", error)
+    return new Response(JSON.stringify({ error: "Failed to generate contract", details: String(error) }), { status: 500, headers: { "Content-Type": "application/json" } })
   }
 }
