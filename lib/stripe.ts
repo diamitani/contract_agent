@@ -23,13 +23,13 @@ export function getStripe() {
 
 export const PRODUCTS = {
   per_contract: {
-    id: "prod_TaBqQcgKUGl22A", // Single Contract Generation
+    id: "prod_UYXX4VNvQC0wD7",
     name: "Single Contract",
     price: 1999, // $19.99 in cents
     description: "Generate one AI-powered contract",
   },
   unlimited: {
-    id: "prod_TZS3I9e38MLwr1", // Unlimited Contracts Pro (reusing existing)
+    id: "prod_UYXXImpcbyRUsN",
     name: "Unlimited Pro",
     price: 999, // $9.99/month in cents
     description: "Unlimited contract generation + analysis",
