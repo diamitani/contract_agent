@@ -1,4 +1,4 @@
-export type AuthProvider = "azure" | "supabase"
+export type AuthProvider = "azure" | "supabase" | "local"
 
 export interface AuthUser {
   id: string
