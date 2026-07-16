@@ -1,32 +1,37 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import type { AuthUser } from "@/lib/auth/types"
+import { useState, useEffect, useCallback } from "react"
+
+interface AuthUser {
+  id: string
+  email: string
+  name?: string
+}
 
 export function useAuthUser() {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const refresh = useCallback(async () => {
+  useEffect(() => {
     try {
-      const response = await fetch("/api/auth/session", { cache: "no-store" })
-      const json = (await response.json()) as { user?: AuthUser | null }
-      setUser(json.user || null)
-    } catch {
-      setUser(null)
-    } finally {
-      setLoading(false)
-    }
+      const loggedIn = localStorage.getItem("artispreneur_logged_in") === "true"
+      const profileStr = localStorage.getItem("artispreneur_profile")
+      if (loggedIn && profileStr) {
+        const profile = JSON.parse(profileStr)
+        setUser({
+          id: profile.email || "user",
+          email: profile.email || "",
+          name: profile.stageName || profile.firstName || "",
+        })
+      }
+    } catch {}
+    setLoading(false)
   }, [])
 
-  useEffect(() => {
-    refresh()
-  }, [refresh])
-
   const signOut = useCallback(async () => {
-    await fetch("/api/auth/logout", { method: "POST" })
+    localStorage.removeItem("artispreneur_logged_in")
     setUser(null)
   }, [])
 
-  return { user, loading, refresh, signOut }
+  return { user, loading, signOut }
 }

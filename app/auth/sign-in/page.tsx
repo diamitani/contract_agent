@@ -1,194 +1,166 @@
 "use client"
 
+import { useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
-import Image from "next/image"
-import { useSearchParams } from "next/navigation"
-import { Suspense } from "react"
-import { FileText, Shield, Zap, PenTool, CheckCircle2 } from "lucide-react"
-import { OAuthButtons } from "@/components/auth/oauth-buttons"
-
-const features = [
-  {
-    icon: FileText,
-    title: "21+ Contract Templates",
-    description: "Professional music industry contracts ready to customize",
-  },
-  {
-    icon: Zap,
-    title: "AI-Powered Generation",
-    description: "Generate complete contracts in seconds with AI assistance",
-  },
-  {
-    icon: Shield,
-    title: "Legal Protection",
-    description: "Protect your rights and revenue with industry-standard terms",
-  },
-  {
-    icon: PenTool,
-    title: "Digital Signatures",
-    description: "Sign and send contracts electronically for faster deals",
-  },
-]
-
-function SignInForm() {
-  const searchParams = useSearchParams()
-
-  const redirectTo = searchParams.get("redirect")
-  const plan = searchParams.get("plan")
-  const contractSlug = searchParams.get("contract")
-
-  const oauthRedirectPath =
-    plan && (plan === "per_contract" || plan === "unlimited")
-      ? `/checkout/${plan}${contractSlug ? `?contract=${contractSlug}` : ""}`
-      : redirectTo || "/dashboard"
-
-  return (
-    <div className="w-full max-w-md">
-      {/* Mobile logo */}
-      <div className="flex flex-col items-center mb-8 lg:hidden">
-        <Link href="/" className="flex items-center gap-3 mb-4">
-          <Image
-            src="/images/artispreneur-20logo.png"
-            alt="Artispreneur Logo"
-            width={56}
-            height={56}
-            className="rounded-lg"
-          />
-        </Link>
-      </div>
-
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-foreground mb-2">Welcome back</h1>
-        <p className="text-muted-foreground">
-          {plan ? "Sign in to complete your purchase" : "Sign in to continue managing your contracts"}
-        </p>
-      </div>
-
-      {plan && (
-        <div className="mb-6 p-4 rounded-lg bg-primary/10 border border-primary/20">
-          <p className="text-sm text-muted-foreground mb-1">Selected plan:</p>
-          <p className="font-semibold text-foreground">
-            {plan === "unlimited" ? "Unlimited Pro - $9.99/mo" : "Single Contract - $19.99"}
-          </p>
-        </div>
-      )}
-
-      <div className="mb-5">
-        <OAuthButtons redirectPath={oauthRedirectPath} mode="signin" />
-      </div>
-
-
-      <div className="mt-8 pt-6 border-t border-border">
-        <p className="text-center text-muted-foreground">
-          Don&apos;t have an account?{" "}
-          <Link
-            href={
-              plan ? `/auth/sign-up?plan=${plan}${contractSlug ? `&contract=${contractSlug}` : ""}` : "/auth/sign-up"
-            }
-            className="text-primary hover:underline font-semibold"
-          >
-            Create one for free
-          </Link>
-        </p>
-      </div>
-
-      <p className="mt-8 text-center text-xs text-muted-foreground">
-        By signing in, you agree to our{" "}
-        <Link href="/terms" className="underline hover:text-foreground">
-          Terms of Service
-        </Link>{" "}
-        and{" "}
-        <Link href="/privacy" className="underline hover:text-foreground">
-          Privacy Policy
-        </Link>
-      </p>
-    </div>
-  )
-}
+import { Header } from "@/components/header"
+import { ArrowRight, LogIn } from "lucide-react"
 
 export default function SignInPage() {
+  const router = useRouter()
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
+    setLoading(true)
+
+    // Check if profile exists in localStorage
+    setTimeout(() => {
+      try {
+        const profile = localStorage.getItem("artispreneur_profile")
+        if (!profile) {
+          setError("No account found with that email. Please sign up first.")
+          setLoading(false)
+          return
+        }
+
+        const parsed = JSON.parse(profile)
+        if (parsed.email?.toLowerCase() === email.toLowerCase() && password.length >= 8) {
+          localStorage.setItem("artispreneur_logged_in", "true")
+          router.push("/")
+        } else if (parsed.email?.toLowerCase() !== email.toLowerCase()) {
+          setError("No account found with that email. Please sign up first.")
+        } else {
+          setError("Invalid password. Please try again.")
+        }
+      } catch {
+        setError("Something went wrong. Please try again.")
+      }
+      setLoading(false)
+    }, 800)
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%", padding: "12px 14px",
+    background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)",
+    borderRadius: 8, color: "#FAFAFA", fontFamily: "inherit", fontSize: 14,
+    outline: "none", transition: "border-color 200ms",
+  }
+
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* Left side - Feature showcase */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary/20 via-background to-accent/10 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent" />
-        <div className="relative z-10 flex flex-col justify-between p-12 w-full">
-          {/* Logo and brand */}
-          <div>
-            <Link href="/" className="flex items-center gap-3">
-              <Image
-                src="/images/artispreneur-20logo.png"
-                alt="Artispreneur Logo"
-                width={48}
-                height={48}
-                className="rounded-lg"
-              />
-              <span className="text-2xl font-bold text-foreground">Artispreneur</span>
-            </Link>
-          </div>
+    <div style={{ backgroundColor: "#050505", minHeight: "100vh" }}>
+      <Header />
 
-          {/* Features list */}
-          <div className="space-y-8">
-            <div>
-              <h2 className="text-3xl font-bold text-foreground mb-2 text-balance">
-                Protect Your Music. <span className="text-primary">Secure Your Future.</span>
-              </h2>
-              <p className="text-muted-foreground text-lg">
-                The all-in-one contract platform built for artists, producers, and music professionals.
-              </p>
+      <section style={{
+        minHeight: "calc(100vh - 64px)", display: "flex", alignItems: "center",
+        justifyContent: "center", padding: "40px 20px",
+        background: "radial-gradient(ellipse 60% 50% at 50% 40%, rgba(201,162,39,0.04), transparent 60%), #050505",
+      }}>
+        <div style={{
+          maxWidth: 420, width: "100%",
+          background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
+          borderRadius: 12, padding: "36px 36px",
+        }}>
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center gap-2 mb-3">
+              <span style={{ fontFamily: "var(--font-serif)", fontSize: 18, fontWeight: 700, color: "#FAFAFA" }}>
+                Rostr<span style={{ color: "#C9A227" }}>Contracts</span>
+              </span>
             </div>
-
-            <div className="space-y-4">
-              {features.map((feature, index) => (
-                <div
-                  key={index}
-                  className="flex items-start gap-4 p-4 rounded-lg bg-card/50 backdrop-blur-sm border border-border/50 transition-colors hover:bg-card/80"
-                >
-                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <feature.icon className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground">{feature.title}</h3>
-                    <p className="text-sm text-muted-foreground">{feature.description}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Testimonial or stats */}
-          <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-lg p-6">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="flex -space-x-2">
-                {[1, 2, 3, 4].map((i) => (
-                  <div
-                    key={i}
-                    className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent border-2 border-background flex items-center justify-center text-xs font-medium text-primary-foreground"
-                  >
-                    {String.fromCharCode(64 + i)}
-                  </div>
-                ))}
-              </div>
-              <div className="flex items-center gap-1">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <CheckCircle2 key={i} className="w-4 h-4 text-accent fill-accent" />
-                ))}
-              </div>
-            </div>
-            <p className="text-sm text-muted-foreground italic">
-              "Artispreneur saved me hours of work and thousands in legal fees. Every artist needs this."
+            <h2 className="text-[20px] font-bold text-white mb-2" style={{ fontFamily: "var(--font-serif)" }}>
+              Welcome back
+            </h2>
+            <p className="text-[12px]" style={{ color: "rgba(250,250,250,0.35)" }}>
+              Sign in to your contract agent workspace
             </p>
-            <p className="text-sm font-medium text-foreground mt-2">— Independent Artist & Producer</p>
+          </div>
+
+          <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div>
+              <label style={{
+                display: "block", fontSize: 12, fontWeight: 600,
+                color: "rgba(250,250,250,0.5)", marginBottom: 6, letterSpacing: "0.02em",
+              }}>
+                Email
+              </label>
+              <input
+                style={inputStyle}
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(201,162,39,0.4)" }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)" }}
+                required
+              />
+            </div>
+
+            <div>
+              <label style={{
+                display: "block", fontSize: 12, fontWeight: 600,
+                color: "rgba(250,250,250,0.5)", marginBottom: 6, letterSpacing: "0.02em",
+              }}>
+                Password
+              </label>
+              <input
+                style={inputStyle}
+                type="password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(201,162,39,0.4)" }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)" }}
+                required
+              />
+            </div>
+
+            {error && (
+              <div style={{
+                background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)",
+                borderRadius: 8, padding: "10px 14px", color: "#EF4444", fontSize: 12, fontWeight: 500,
+              }}>
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                background: loading ? "rgba(255,255,255,0.05)" : "#CC0000",
+                color: loading ? "rgba(250,250,250,0.2)" : "#fff",
+                border: "none", borderRadius: 8, padding: "13px 0", fontSize: 14, fontWeight: 700,
+                cursor: loading ? "not-allowed" : "pointer",
+                fontFamily: "inherit", display: "flex", alignItems: "center",
+                justifyContent: "center", gap: 8, transition: "all 200ms",
+                width: "100%", marginTop: 4,
+              }}>
+              {loading ? (
+                <span style={{
+                  width: 18, height: 18, borderRadius: "50%",
+                  border: "2px solid rgba(250,250,250,0.15)", borderTopColor: "rgba(250,250,250,0.4)",
+                  animation: "spin 0.6s linear infinite", display: "inline-block",
+                }} />
+              ) : (
+                <>Sign In <LogIn className="w-4 h-4" /></>
+              )}
+            </button>
+          </form>
+
+          <div className="text-center mt-6">
+            <p className="text-[12px]" style={{ color: "rgba(250,250,250,0.3)" }}>
+              Don't have an account?{" "}
+              <Link href="/auth/sign-up" style={{ color: "#C9A227", fontWeight: 600 }}>
+                Sign up free
+              </Link>
+            </p>
           </div>
         </div>
-      </div>
-
-      {/* Right side - Sign in form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-12">
-        <Suspense fallback={<div className="w-full max-w-md animate-pulse bg-muted h-96 rounded-lg" />}>
-          <SignInForm />
-        </Suspense>
-      </div>
+      </section>
     </div>
   )
 }

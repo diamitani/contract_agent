@@ -3,83 +3,93 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Updated to Artispreneur brand colors - Red (#C41E3A) and Gold (#D4AF37) */
+/* ════════════════════════════════════════════════════
+   ARTISPRENEUR CONTRACT AGENT — Design DNA
+   Background: #050505 · Gold: #C9A227 · Red: #CC0000
+   Fonts: Playfair Display (serif) + Inter (sans)
+   ════════════════════════════════════════════════════ */
+
 :root {
-  --background: oklch(0.12 0.005 260);
-  --foreground: oklch(0.95 0 0);
-  --card: oklch(0.15 0.005 260);
-  --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.15 0.005 260);
-  --popover-foreground: oklch(0.95 0 0);
-  /* Primary: Artispreneur Red */
-  --primary: oklch(0.5 0.2 25);
+  --background: oklch(0.04 0.002 250);
+  --foreground: oklch(0.98 0 0);
+  --card: oklch(0.08 0.002 250);
+  --card-foreground: oklch(0.98 0 0);
+  --popover: oklch(0.08 0.002 250);
+  --popover-foreground: oklch(0.98 0 0);
+  /* Primary: Artispreneur Red #CC0000 */
+  --primary: oklch(0.52 0.22 25);
   --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.2 0.005 260);
-  --secondary-foreground: oklch(0.95 0 0);
-  --muted: oklch(0.2 0.005 260);
-  --muted-foreground: oklch(0.65 0 0);
-  /* Accent: Artispreneur Gold */
-  --accent: oklch(0.75 0.14 85);
-  --accent-foreground: oklch(0.15 0 0);
+  --secondary: oklch(0.12 0.002 250);
+  --secondary-foreground: oklch(0.98 0 0);
+  --muted: oklch(0.15 0.002 250);
+  --muted-foreground: oklch(0.55 0 0);
+  /* Accent: Artispreneur Gold #C9A227 */
+  --accent: oklch(0.72 0.19 85);
+  --accent-foreground: oklch(0.12 0 0);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.95 0 0);
-  --border: oklch(0.26 0.005 260);
-  --input: oklch(0.2 0.005 260);
-  --ring: oklch(0.5 0.2 25);
-  --chart-1: oklch(0.5 0.2 25);
-  --chart-2: oklch(0.75 0.14 85);
+  --border: oklch(0.18 0.002 250);
+  --input: oklch(0.12 0.002 250);
+  --ring: oklch(0.72 0.19 85);
+  --chart-1: oklch(0.72 0.19 85);
+  --chart-2: oklch(0.52 0.22 25);
   --chart-3: oklch(0.65 0.15 280);
   --chart-4: oklch(0.7 0.18 30);
   --chart-5: oklch(0.6 0.12 140);
   --radius: 0.5rem;
-  --sidebar: oklch(0.1 0.005 260);
-  --sidebar-foreground: oklch(0.95 0 0);
-  --sidebar-primary: oklch(0.5 0.2 25);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.2 0.005 260);
-  --sidebar-accent-foreground: oklch(0.95 0 0);
-  --sidebar-border: oklch(0.26 0.005 260);
-  --sidebar-ring: oklch(0.5 0.2 25);
+  --sidebar: oklch(0.06 0.002 250);
+  --sidebar-foreground: oklch(0.98 0 0);
+  --sidebar-primary: oklch(0.72 0.19 85);
+  --sidebar-primary-foreground: oklch(0.12 0 0);
+  --sidebar-accent: oklch(0.12 0.002 250);
+  --sidebar-accent-foreground: oklch(0.98 0 0);
+  --sidebar-border: oklch(0.18 0.002 250);
+  --sidebar-ring: oklch(0.72 0.19 85);
+
+  /* ═══ Artispreneur Design Tokens ═══ */
+  --gold: #C9A227;
+  --gold-light: #E5C44D;
+  --crimson: #CC0000;
+  --crimson-dark: #990000;
+  --bg-deep: #050505;
+  --surface: #0A0A0A;
+  --surface-raised: #0F0F0F;
+  --ink: #FAFAFA;
+  --ink-muted: rgba(250, 250, 250, 0.55);
+  --ink-dim: rgba(250, 250, 250, 0.30);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-soft: rgba(255, 255, 255, 0.10);
+  --font-serif: 'Playfair Display', Georgia, serif;
+  --font-sans: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
 }
 
 .dark {
-  --background: oklch(0.12 0.005 260);
-  --foreground: oklch(0.95 0 0);
-  --card: oklch(0.15 0.005 260);
-  --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.15 0.005 260);
-  --popover-foreground: oklch(0.95 0 0);
-  --primary: oklch(0.5 0.2 25);
+  --background: oklch(0.04 0.002 250);
+  --foreground: oklch(0.98 0 0);
+  --card: oklch(0.08 0.002 250);
+  --card-foreground: oklch(0.98 0 0);
+  --popover: oklch(0.08 0.002 250);
+  --popover-foreground: oklch(0.98 0 0);
+  --primary: oklch(0.52 0.22 25);
   --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.2 0.005 260);
-  --secondary-foreground: oklch(0.95 0 0);
-  --muted: oklch(0.2 0.005 260);
-  --muted-foreground: oklch(0.65 0 0);
-  --accent: oklch(0.75 0.14 85);
-  --accent-foreground: oklch(0.15 0 0);
+  --secondary: oklch(0.12 0.002 250);
+  --secondary-foreground: oklch(0.98 0 0);
+  --muted: oklch(0.15 0.002 250);
+  --muted-foreground: oklch(0.55 0 0);
+  --accent: oklch(0.72 0.19 85);
+  --accent-foreground: oklch(0.12 0 0);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.95 0 0);
-  --border: oklch(0.26 0.005 260);
-  --input: oklch(0.2 0.005 260);
-  --ring: oklch(0.5 0.2 25);
-  --chart-1: oklch(0.5 0.2 25);
-  --chart-2: oklch(0.75 0.14 85);
-  --chart-3: oklch(0.65 0.15 280);
-  --chart-4: oklch(0.7 0.18 30);
-  --chart-5: oklch(0.6 0.12 140);
-  --sidebar: oklch(0.1 0.005 260);
-  --sidebar-foreground: oklch(0.95 0 0);
-  --sidebar-primary: oklch(0.5 0.2 25);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.2 0.005 260);
-  --sidebar-accent-foreground: oklch(0.95 0 0);
-  --sidebar-border: oklch(0.26 0.005 260);
-  --sidebar-ring: oklch(0.5 0.2 25);
+  --border: oklch(0.18 0.002 250);
+  --input: oklch(0.12 0.002 250);
+  --ring: oklch(0.72 0.19 85);
 }
 
 @theme inline {
-  --font-sans: "Geist", "Geist Fallback";
-  --font-mono: "Geist Mono", "Geist Mono Fallback";
+  --font-sans: "Inter", "Inter Fallback";
+  --font-serif: "Playfair Display", "Playfair Display Fallback";
+  --font-mono: "JetBrains Mono", "JetBrains Mono Fallback";
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -119,10 +129,109 @@
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
+  * { @apply border-border outline-ring/50; }
   body {
     @apply bg-background text-foreground;
+    background-color: #050505;
   }
+}
+
+/* ═══ Grain noise overlay ═══ */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ═══ Custom scrollbar ═══ */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(201, 162, 39, 0.3);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(201, 162, 39, 0.6); }
+
+/* ═══ Selection ═══ */
+::selection {
+  background: rgba(201, 162, 39, 0.25);
+  color: #FAFAFA;
+}
+
+/* ═══ Gold gradient text ═══ */
+.text-gradient-gold {
+  background: linear-gradient(135deg, #C9A227 0%, #FED001 50%, #C9A227 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ═══ Shimmer animation ═══ */
+@keyframes shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, var(--ink) 0%, var(--gold) 50%, var(--ink) 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 3s linear infinite;
+}
+
+/* ═══ Animations ═══ */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; } to { opacity: 1; }
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; } 50% { opacity: 0; }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.8); }
+}
+.animate-fade-up { animation: fade-up 0.6s ease both; }
+.animate-fade-in { animation: fade-in 0.4s ease both; }
+
+/* ═══ Glass effects ═══ */
+.glass-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+}
+.glass-dark {
+  background: rgba(10, 10, 10, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(16px);
+}
+
+/* ═══ Section divider ═══ */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(201, 162, 39, 0.3), transparent);
+}
+
+/* ═══ Magnetic button ═══ */
+.magnetic-btn {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.magnetic-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(201, 162, 39, 0.12);
+}
+
+/* ═══ Cursor blink for typewriter ═══ */
+.cursor-blink::after {
+  content: "|";
+  animation: blink 1s step-end infinite;
+  color: var(--gold);
 }

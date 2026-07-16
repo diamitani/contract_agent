@@ -1,49 +1,24 @@
-import { cookies } from "next/headers"
-import type { AuthUser } from "@/lib/auth/types"
-import { AUTH_SESSION_COOKIE, verifySessionToken } from "@/lib/auth/session"
-import { createClient as createSupabaseServerClient } from "@/lib/supabase/server"
-
-function hasSupabaseEnv() {
-  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+// localStorage-based auth for server components (stub — returns null in server context)
+export interface AuthUser {
+  id: string
+  email: string
+  name?: string
 }
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
-  const cookieStore = await cookies()
-  const token = cookieStore.get(AUTH_SESSION_COOKIE)?.value
-
-  if (token) {
-    const sessionUser = await verifySessionToken(token)
-    if (sessionUser) {
-      return sessionUser
-    }
-  }
-
-  if (!hasSupabaseEnv()) {
-    return null
-  }
-
+  // In server context, return null (auth is client-side only)
+  if (typeof window === "undefined") return null
   try {
-    const supabase = await createSupabaseServerClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return null
+    const loggedIn = localStorage.getItem("artispreneur_logged_in") === "true"
+    const profileStr = localStorage.getItem("artispreneur_profile")
+    if (loggedIn && profileStr) {
+      const profile = JSON.parse(profileStr)
+      return {
+        id: profile.email || "user",
+        email: profile.email || "",
+        name: profile.stageName || profile.firstName || "",
+      }
     }
-
-    return {
-      id: user.id,
-      email: user.email || null,
-      name: (user.user_metadata?.full_name as string | undefined) || (user.user_metadata?.name as string | undefined) || null,
-      provider: "supabase",
-      created_at: user.created_at,
-    }
-  } catch {
-    return null
-  }
-}
-
-export function hasSupabaseSessionCookie(cookieNames: string[]) {
-  return cookieNames.some((name) => name.startsWith("sb-") && name.includes("auth-token"))
+  } catch {}
+  return null
 }

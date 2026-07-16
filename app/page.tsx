@@ -1,398 +1,1031 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { useAuthUser } from "@/hooks/use-auth-user"
+import Link from "next/link"
 import { Header } from "@/components/header"
-import { AiContractBuilder } from "@/components/ai-contract-builder"
-import { ContractCard } from "@/components/contract-card"
-import { PDFPreviewModal } from "@/components/pdf-preview-modal"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { getSavedContracts, type SavedContract } from "@/lib/contract-store"
 import { contractTemplates, type ContractTemplate } from "@/lib/contracts"
 import {
-  FileText,
-  Upload,
-  FolderOpen,
-  Crown,
-  Zap,
-  LayoutDashboard,
-  Sparkles,
-  ArrowRight,
-  Loader2,
-  Search,
-  Shield,
-  Brain,
-  Download,
-  PenTool,
-  CheckCircle2,
-  Clock,
-  Star,
-  TrendingUp,
-  Users,
-  ChevronRight,
+  Sparkles, FileText, Shield, Zap, Search, ArrowRight,
+  ChevronRight, CheckCircle2, Star, Clock, Brain, Download,
+  MessageSquare, LayoutDashboard, Crown, PenTool,
 } from "lucide-react"
-import Link from "next/link"
-import { motion } from "framer-motion"
 
-const fadeIn = {
-  hidden: { opacity: 0, y: 30 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" as const } },
-}
-
-const staggerContainer = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.1, duration: 0.5, ease: "easeOut" as const } },
-}
-
+/* ════════════════════════════════════════════════════
+   LANDING PAGE — Unauthenticated visitors
+   ════════════════════════════════════════════════════ */
 function LandingPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-  const [previewContract, setPreviewContract] = useState<ContractTemplate | null>(null)
-  const [previewOpen, setPreviewOpen] = useState(false)
 
   const categories = Array.from(new Set(contractTemplates.map((c) => c.category)))
-  const filteredContracts = contractTemplates.filter((contract) => {
+  const filteredContracts = contractTemplates.filter((c) => {
     const matchesSearch =
-      contract.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      contract.description.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesCategory = !selectedCategory || contract.category === selectedCategory
+      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.description.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesCategory = !selectedCategory || c.category === selectedCategory
     return matchesSearch && matchesCategory
   })
 
-  const handlePreview = (contract: ContractTemplate) => {
-    setPreviewContract(contract)
-    setPreviewOpen(true)
-  }
+  const fadeIn = { animation: "fade-up 0.6s ease both" }
+  const fadeIn2 = { animation: "fade-up 0.6s 0.15s ease both" }
+  const fadeIn3 = { animation: "fade-up 0.6s 0.3s ease both" }
+  const fadeIn4 = { animation: "fade-up 0.6s 0.45s ease both" }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div style={{ backgroundColor: "#050505", minHeight: "100vh" }}>
       <Header />
 
-      <section className="border-b border-border bg-gradient-to-b from-primary/5 to-transparent overflow-hidden">
-        <div className="container mx-auto px-4 py-16 md:py-24 text-center">
-          <motion.div initial="hidden" animate="visible" variants={fadeIn} className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full mb-6">
-            <Sparkles className="w-4 h-4" />
-            <span className="text-sm font-medium">AI-Powered Contract Generation</span>
-          </motion.div>
-          <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }} className="text-4xl md:text-6xl lg:text-7xl font-bold text-foreground mb-6 text-balance tracking-tight">
-            Professional Contracts for the
-            <span className="text-primary block mt-2"> Music Industry</span>
-          </motion.h1>
-          <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }} className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto mb-8 text-pretty">
-            Generate legally structured agreements in minutes. From recording deals to management contracts, protect your music business with AI-powered documentation.
-          </motion.p>
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.3 }} className="flex flex-wrap justify-center gap-4 mb-6">
+      {/* ═══ HERO ═══ */}
+      <section style={{
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        background: "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(204,0,0,0.12) 0%, transparent 60%), #050505",
+        position: "relative",
+        overflow: "hidden",
+      }}>
+        {/* Grid lines */}
+        <div style={{
+          position: "absolute", inset: 0,
+          backgroundImage: "linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px)",
+          backgroundSize: "80px 80px", pointerEvents: "none",
+        }} />
+
+        <div className="container mx-auto px-4 py-16 md:py-28 text-center relative z-10">
+          {/* Badge */}
+          <div style={fadeIn} className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-8"
+            style={{ border: "1px solid rgba(201,162,39,0.2)", background: "rgba(201,162,39,0.06)" }}>
+            <Sparkles className="w-3.5 h-3.5" style={{ color: "#C9A227" }} />
+            <span className="text-[12px] font-semibold tracking-[0.08em] uppercase" style={{ color: "#C9A227" }}>
+              AI Contract Agent
+            </span>
+          </div>
+
+          {/* Headline */}
+          <h1 style={{
+            ...fadeIn2,
+            fontFamily: "var(--font-serif)",
+            fontSize: "clamp(40px, 7vw, 80px)",
+            fontWeight: 800,
+            lineHeight: 1.05,
+            letterSpacing: "-0.03em",
+            color: "#FAFAFA",
+            marginBottom: 24,
+            maxWidth: 800,
+            margin: "0 auto 24px",
+          }}>
+            Get it in{" "}
+            <span className="shimmer" style={{
+              display: "block",
+              fontSize: "clamp(48px, 8vw, 96px)",
+              fontStyle: "italic",
+              fontWeight: 500,
+            }}>
+              writing.
+            </span>
+          </h1>
+
+          {/* Subhead */}
+          <p style={{
+            ...fadeIn3,
+            fontSize: "clamp(15px, 1.6vw, 18px)",
+            color: "rgba(250,250,250,0.5)",
+            lineHeight: 1.7,
+            maxWidth: 560,
+            margin: "0 auto 40px",
+          }}>
+            Twenty-one industry-grade music contracts generated by AI in minutes.
+            No lawyer needed. Free to start, yours to keep.
+          </p>
+
+          {/* CTAs */}
+          <div style={{ ...fadeIn4, display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginBottom: 48 }}>
             <Link href="/auth/sign-up">
-              <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:-translate-y-1 transition-all duration-300 h-14 px-8 text-base">
-                Get Started Free <Sparkles className="w-4 h-4 ml-2" />
-              </Button>
+              <button style={{
+                background: "#CC0000", color: "#fff", border: "none",
+                borderRadius: 8, padding: "15px 36px", fontSize: 15, fontWeight: 700,
+                cursor: "pointer", fontFamily: "inherit",
+                display: "flex", alignItems: "center", gap: 8,
+                transition: "all 200ms ease", boxShadow: "0 4px 24px rgba(204,0,0,0.25)",
+              }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-2px)"
+                  e.currentTarget.style.boxShadow = "0 8px 32px rgba(204,0,0,0.35)"
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)"
+                  e.currentTarget.style.boxShadow = "0 4px 24px rgba(204,0,0,0.25)"
+                }}
+              >
+                Generate Your First Contract <ArrowRight className="w-4 h-4" />
+              </button>
             </Link>
-            <Link href="#contracts">
-              <Button size="lg" variant="outline" className="hover:bg-accent hover:text-accent-foreground hover:border-accent hover:-translate-y-1 transition-all duration-300 h-14 px-8 text-base">
-                Browse Templates <ChevronRight className="w-4 h-4 ml-2" />
-              </Button>
-            </Link>
-          </motion.div>
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1, delay: 0.5 }} className="flex flex-wrap justify-center gap-8 md:gap-12 pt-8 border-t border-border/50">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center"><FileText className="w-5 h-5 text-primary" /></div>
-              <div className="text-left"><p className="font-semibold text-foreground">{contractTemplates.length}+ Templates</p><p className="text-sm text-muted-foreground">Industry-standard</p></div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center"><Zap className="w-5 h-5 text-accent" /></div>
-              <div className="text-left"><p className="font-semibold text-foreground">2 Min Generation</p><p className="text-sm text-muted-foreground">AI-powered speed</p></div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center"><Shield className="w-5 h-5 text-green-500" /></div>
-              <div className="text-left"><p className="font-semibold text-foreground">Legally Sound</p><p className="text-sm text-muted-foreground">Professional language</p></div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-chart-4/10 flex items-center justify-center"><Users className="w-5 h-5 text-chart-4" /></div>
-              <div className="text-left"><p className="font-semibold text-foreground">5,000+ Professionals</p><p className="text-sm text-muted-foreground">Trust Artispreneur</p></div>
-            </div>
-          </motion.div>
+            <a href="#templates">
+              <button style={{
+                background: "transparent", color: "rgba(250,250,250,0.7)",
+                border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8,
+                padding: "15px 28px", fontSize: 15, fontWeight: 500,
+                cursor: "pointer", fontFamily: "inherit", transition: "all 200ms ease",
+              }}>
+                Browse Templates
+              </button>
+            </a>
+          </div>
+
+          {/* Trust badges */}
+          <div style={{ animation: "fade-in 0.8s 0.6s ease both", display: "flex", alignItems: "center", justifyContent: "center", gap: 32 }}>
+            {[
+              { icon: FileText, label: "21+ Templates" },
+              { icon: Zap, label: "2 Min Generation" },
+              { icon: Shield, label: "Industry Standard" },
+              { icon: Crown, label: "Free Forever" },
+            ].map((item, i) => {
+              const Icon = item.icon
+              return (
+                <div key={i} className="flex items-center gap-2">
+                  <Icon className="w-4 h-4" style={{ color: "#C9A227", opacity: 0.6 }} />
+                  <span className="text-[11px] font-medium tracking-[0.04em] uppercase" style={{ color: "rgba(250,250,250,0.35)" }}>
+                    {item.label}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
         </div>
       </section>
 
-      <section id="contracts" className="border-y border-border bg-secondary/30 relative">
-        <div className="container mx-auto px-4 py-20 md:py-32 relative z-10">
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeIn} className="text-center mb-12">
-            <h2 className="text-3xl md:text-5xl font-bold text-foreground mb-4">Generate Your Contract</h2>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">Select a template to start generating your AI-powered contract</p>
-          </motion.div>
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeIn} className="flex flex-col gap-4 mb-12 max-w-3xl mx-auto">
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <Input placeholder="Search contracts..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 bg-input border-border text-foreground placeholder:text-muted-foreground" />
+      {/* ═══ STAT STRIP ═══ */}
+      <section style={{
+        background: "#0A0A0A", borderBottom: "1px solid rgba(255,255,255,0.06)",
+        display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 0,
+      }}>
+        {[
+          { num: "21", label: "Industry Templates", em: "+" },
+          { num: "2", label: "Avg Draft Time", em: "min" },
+          { num: "5,000", label: "Music Professionals", em: "+" },
+          { num: "$0", label: "To Start, Forever", em: "" },
+        ].map((stat, i) => (
+          <div key={i} style={{
+            padding: "28px 24px",
+            borderLeft: i > 0 ? "1px solid rgba(255,255,255,0.06)" : "none",
+            display: "flex", flexDirection: "column", gap: 4,
+          }}>
+            <span style={{
+              fontFamily: "var(--font-sans)", fontSize: "clamp(24px, 3vw, 40px)",
+              fontWeight: 700, letterSpacing: "-0.03em", lineHeight: 1, color: "#FAFAFA",
+            }}>
+              {stat.num}<em style={{
+                fontFamily: "var(--font-serif)", fontStyle: "italic",
+                fontWeight: 500, color: "#C9A227", marginLeft: 2,
+              }}>{stat.em}</em>
+            </span>
+            <span className="text-[10px] tracking-[0.12em] uppercase" style={{ color: "rgba(250,250,250,0.3)", fontFamily: "var(--font-mono)" }}>
+              {stat.label}
+            </span>
+          </div>
+        ))}
+      </section>
+
+      {/* ═══ HOW IT WORKS ═══ */}
+      <section style={{ padding: "100px 32px", position: "relative" }}>
+        <div className="container mx-auto">
+          <div className="text-center mb-16">
+            <p className="text-[11px] font-bold tracking-[0.14em] uppercase mb-4" style={{ color: "#C9A227", fontFamily: "var(--font-mono)" }}>
+              // Workflow
+            </p>
+            <h2 style={{
+              fontFamily: "var(--font-serif)", fontSize: "clamp(28px, 4vw, 44px)",
+              fontWeight: 700, letterSpacing: "-0.02em", color: "#FAFAFA",
+            }}>
+              From blank page to <em style={{ fontStyle: "italic", color: "#C9A227" }}>signature-ready</em><br />in four steps.
+            </h2>
+          </div>
+
+          <div style={{
+            display: "grid", gridTemplateColumns: "repeat(4, 1fr)",
+            borderTop: "1px solid rgba(255,255,255,0.06)",
+            borderBottom: "1px solid rgba(255,255,255,0.06)",
+          }}>
+            {[
+              { num: "01", title: "Choose Template", desc: "Pick from 21 industry-standard agreements — recording, management, publishing, and more." },
+              { num: "02", title: "Fill the Details", desc: "Enter parties, terms, splits, and dates through a guided form built for music." },
+              { num: "03", title: "AI Generation", desc: "Our AI assembles a complete, professionally worded contract in under two minutes." },
+              { num: "04", title: "Download & Sign", desc: "Export to PDF, send for e-signature, and store in your Artispreneur vault." },
+            ].map((step, i) => (
+              <div key={i} style={{
+                padding: "38px 28px",
+                borderRight: i < 3 ? "1px solid rgba(255,255,255,0.06)" : "none",
+                transition: "background 350ms",
+              }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.02)" }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent" }}
+              >
+                <div style={{
+                  fontFamily: "var(--font-serif)", fontStyle: "italic", fontWeight: 500,
+                  fontSize: 56, lineHeight: 0.9, color: "#C9A227", marginBottom: 16,
+                  letterSpacing: "-0.04em",
+                }}>{step.num}</div>
+                <h3 className="text-[17px] font-bold text-white mb-2">{step.title}</h3>
+                <p className="text-[13px] leading-relaxed" style={{ color: "rgba(250,250,250,0.45)" }}>{step.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ AI AGENT CHAT PREVIEW ═══ */}
+      <section style={{
+        padding: "100px 32px",
+        background: "#0A0A0A",
+        borderTop: "1px solid rgba(255,255,255,0.06)",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
+      }}>
+        <div className="container mx-auto" style={{ maxWidth: 900 }}>
+          <div className="text-center mb-12">
+            <p className="text-[11px] font-bold tracking-[0.14em] uppercase mb-4" style={{ color: "#C9A227", fontFamily: "var(--font-mono)" }}>
+              // AI Contract Agent
+            </p>
+            <h2 style={{
+              fontFamily: "var(--font-serif)", fontSize: "clamp(28px, 4vw, 44px)",
+              fontWeight: 700, letterSpacing: "-0.02em", color: "#FAFAFA",
+            }}>
+              Your personal{" "}
+              <em style={{ fontStyle: "italic", color: "#C9A227" }}>contract agent</em>
+            </h2>
+            <p className="text-[15px] mt-4" style={{ color: "rgba(250,250,250,0.45)", maxWidth: 480, margin: "12px auto 0" }}>
+              Chat with an AI that knows music contracts. Describe what you need and get a complete, ready-to-sign agreement.
+            </p>
+          </div>
+
+          {/* Chat preview */}
+          <div style={{
+            background: "rgba(255,255,255,0.02)",
+            border: "1px solid rgba(255,255,255,0.06)",
+            borderRadius: 12,
+            padding: 28,
+            maxWidth: 640,
+            margin: "0 auto",
+          }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* User message */}
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <div style={{
+                  maxWidth: "75%",
+                  padding: "10px 14px",
+                  borderRadius: "10px 10px 2px 10px",
+                  backgroundColor: "#CC0000",
+                  color: "#fff",
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                }}>
+                  I need a production agreement for a beat I made. Producer keeps 50% publishing, artist gets master rights.
+                </div>
+              </div>
+              {/* Agent response */}
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: "50%",
+                  backgroundColor: "#C9A227", display: "flex", alignItems: "center", justifyContent: "center",
+                  flexShrink: 0, marginTop: 2,
+                }}>
+                  <Sparkles className="w-3.5 h-3.5" style={{ color: "#050505" }} />
+                </div>
+                <div style={{
+                  maxWidth: "80%",
+                  padding: "12px 16px",
+                  borderRadius: "10px 10px 10px 2px",
+                  backgroundColor: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  color: "#FAFAFA",
+                  fontSize: 13,
+                  lineHeight: 1.7,
+                }}>
+                  <strong>Music Production Agreement</strong> — here's what I've drafted:
+                  <br /><br />
+                  • Producer: <span style={{ color: "#C9A227" }}>50% publishing</span>, producer royalties
+                  <br />
+                  • Artist/Client: <span style={{ color: "#C9A227" }}>Master rights</span>, creative control
+                  <br />
+                  • 16 standard fields filled from your description
+                  <br /><br />
+                  Ready to generate the full PDF. Would you like to review the fields first?
+                </div>
+              </div>
             </div>
-            <div className="flex gap-2 flex-wrap justify-center">
-              <Badge variant={selectedCategory === null ? "default" : "outline"} className={`cursor-pointer ${selectedCategory === null ? "bg-primary text-primary-foreground" : "border-border text-foreground hover:bg-secondary"}`} onClick={() => setSelectedCategory(null)}>All</Badge>
-              {categories.map((category) => (
-                <Badge key={category} variant={selectedCategory === category ? "default" : "outline"} className={`cursor-pointer ${selectedCategory === category ? "bg-primary text-primary-foreground" : "border-border text-foreground hover:bg-secondary"}`} onClick={() => setSelectedCategory(category)}>{category}</Badge>
+
+            {/* Chat input */}
+            <div style={{
+              marginTop: 16,
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 8,
+              padding: "10px 14px",
+              display: "flex", alignItems: "center", gap: 8,
+            }}>
+              <input
+                disabled
+                placeholder="Describe the contract you need..."
+                style={{
+                  flex: 1, background: "transparent", border: "none",
+                  outline: "none", color: "rgba(250,250,250,0.3)", fontFamily: "inherit",
+                  fontSize: 13,
+                }}
+              />
+              <span style={{
+                display: "flex", alignItems: "center", gap: 6,
+                background: "#CC0000", color: "#fff", border: "none",
+                borderRadius: 6, padding: "7px 14px", fontSize: 12, fontWeight: 600,
+                opacity: 0.4,
+              }}>
+                Send <ArrowRight className="w-3 h-3" />
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ TEMPLATES ═══ */}
+      <section id="templates" style={{ padding: "100px 32px" }}>
+        <div className="container mx-auto">
+          <div className="flex flex-wrap justify-between items-end gap-6 mb-12">
+            <div>
+              <p className="text-[11px] font-bold tracking-[0.14em] uppercase mb-4" style={{ color: "#C9A227", fontFamily: "var(--font-mono)" }}>
+                // The Library
+              </p>
+              <h2 style={{
+                fontFamily: "var(--font-serif)", fontSize: "clamp(28px, 4vw, 44px)",
+                fontWeight: 700, letterSpacing: "-0.02em", color: "#FAFAFA",
+              }}>
+                Twenty-one contracts.<br />
+                <em style={{ fontStyle: "italic", color: "#C9A227" }}>Every situation in the room.</em>
+              </h2>
+            </div>
+          </div>
+
+          {/* Search + Filters */}
+          <div className="flex flex-col gap-4 mb-10">
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 opacity-30" />
+              <input
+                placeholder="Search contracts..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  width: "100%", padding: "10px 14px 10px 36px",
+                  background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 8, color: "#FAFAFA", fontFamily: "inherit", fontSize: 13,
+                  outline: "none",
+                }}
+              />
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={() => setSelectedCategory(null)}
+                style={{
+                  padding: "7px 14px", borderRadius: 999, border: "1px solid",
+                  borderColor: !selectedCategory ? "#C9A227" : "rgba(255,255,255,0.1)",
+                  background: !selectedCategory ? "#C9A227" : "transparent",
+                  color: !selectedCategory ? "#050505" : "rgba(250,250,250,0.5)",
+                  fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 600,
+                  letterSpacing: "0.08em", textTransform: "uppercase",
+                  cursor: "pointer", transition: "all 200ms",
+                }}>
+                All <span style={{ marginLeft: 6, opacity: 0.6 }}>{contractTemplates.length}</span>
+              </button>
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  style={{
+                    padding: "7px 14px", borderRadius: 999, border: "1px solid",
+                    borderColor: selectedCategory === cat ? "#C9A227" : "rgba(255,255,255,0.1)",
+                    background: selectedCategory === cat ? "#C9A227" : "transparent",
+                    color: selectedCategory === cat ? "#050505" : "rgba(250,250,250,0.5)",
+                    fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 600,
+                    letterSpacing: "0.08em", textTransform: "uppercase",
+                    cursor: "pointer", transition: "all 200ms",
+                  }}>
+                  {cat}
+                </button>
               ))}
             </div>
-          </motion.div>
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={staggerContainer} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          </div>
+
+          {/* Template Grid */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+            gap: 16,
+          }}>
             {filteredContracts.map((contract) => (
-              <motion.div variants={fadeIn} key={contract.id}>
-                <ContractCard contract={contract} onPreview={() => handlePreview(contract)} />
-              </motion.div>
+              <Link
+                key={contract.id}
+                href={`/generate?template=${contract.slug}`}
+                style={{ textDecoration: "none", color: "inherit" }}
+              >
+                <div
+                  className="magnetic-btn"
+                  style={{
+                    background: "rgba(255,255,255,0.02)",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                    borderRadius: 10,
+                    overflow: "hidden",
+                    display: "flex", flexDirection: "column",
+                    cursor: "pointer",
+                  }}
+                >
+                  {/* Cover image placeholder */}
+                  <div style={{
+                    aspectRatio: "16/10",
+                    position: "relative",
+                    overflow: "hidden",
+                    background: "linear-gradient(135deg, rgba(204,0,0,0.2), rgba(201,162,39,0.1))",
+                  }}>
+                    <span style={{
+                      position: "absolute", top: 12, left: 12,
+                      fontFamily: "var(--font-mono)", fontSize: 9,
+                      letterSpacing: "0.14em", textTransform: "uppercase",
+                      background: "rgba(5,5,5,0.85)", color: "#FAFAFA",
+                      padding: "4px 8px", borderRadius: 999,
+                    }}>
+                      {contract.category}
+                    </span>
+                    <div style={{
+                      position: "absolute", bottom: 10, left: 12, right: 12,
+                      display: "flex", justifyContent: "space-between",
+                      fontFamily: "var(--font-mono)", fontSize: 9,
+                      letterSpacing: "0.06em", textTransform: "uppercase",
+                      color: "rgba(250,250,250,0.4)",
+                    }}>
+                      <span>{contract.fields.length} fields</span>
+                      <span>0 required</span>
+                    </div>
+                  </div>
+                  {/* Body */}
+                  <div style={{ padding: "18px 18px 16px", flex: 1, display: "flex", flexDirection: "column" }}>
+                    <h3 className="text-[16px] font-bold text-white mb-2" style={{ letterSpacing: "-0.01em" }}>
+                      {contract.name}
+                    </h3>
+                    <p className="text-[12px] leading-relaxed mb-4 flex-1" style={{ color: "rgba(250,250,250,0.4)" }}>
+                      {contract.description}
+                    </p>
+                    <div style={{
+                      paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.06)",
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      fontFamily: "var(--font-mono)", fontSize: 10,
+                      color: "rgba(250,250,250,0.3)",
+                    }}>
+                      <span>Preview</span>
+                      <span style={{ color: "#C9A227", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                        Generate →
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </Link>
             ))}
-          </motion.div>
+          </div>
+
           {filteredContracts.length === 0 && (
-            <div className="text-center py-12"><FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" /><p className="text-lg text-foreground">No contracts found</p><p className="text-muted-foreground">Try adjusting your search or filters</p></div>
+            <div className="text-center py-16">
+              <FileText className="w-10 h-10 mx-auto mb-4" style={{ color: "rgba(250,250,250,0.15)" }} />
+              <p className="text-white/30">No contracts found. Try a different search.</p>
+            </div>
           )}
         </div>
       </section>
 
-      <section className="container mx-auto px-4 py-20 md:py-32">
-        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeIn} className="text-center mb-16">
-          <h2 className="text-3xl md:text-5xl font-bold text-foreground mb-4">Everything You Need</h2>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">Complete contract management for music professionals</p>
-        </motion.div>
-        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={staggerContainer} className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+      {/* ═══ FEATURES ═══ */}
+      <section style={{
+        padding: "100px 32px",
+        background: "#0A0A0A",
+        borderTop: "1px solid rgba(255,255,255,0.06)",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
+      }}>
+        <div className="container mx-auto text-center mb-16">
+          <p className="text-[11px] font-bold tracking-[0.14em] uppercase mb-4" style={{ color: "#C9A227", fontFamily: "var(--font-mono)" }}>
+            // Features
+          </p>
+          <h2 style={{
+            fontFamily: "var(--font-serif)", fontSize: "clamp(28px, 4vw, 44px)",
+            fontWeight: 700, letterSpacing: "-0.02em", color: "#FAFAFA",
+          }}>
+            Everything you need for<br />
+            <em style={{ fontStyle: "italic", color: "#C9A227" }}>music contracts</em>
+          </h2>
+        </div>
+
+        <div className="container mx-auto" style={{
+          display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16,
+        }}>
           {[
-            { icon: Sparkles, title: "AI Generation", desc: "Complete professional contracts in minutes", checks: [`${contractTemplates.length}+ industry templates`, "Customized to your terms", "Legally structured language"], href: "/auth/sign-up", color: "primary" },
-            { icon: Brain, title: "AI Analysis", desc: "Instantly understand any contract you receive", checks: ["Upload PDF, DOCX & more", "Identify risks and red flags", "Chat with AI about any clause"], href: "/auth/sign-up", color: "accent" },
-            { icon: Download, title: "Free Templates", desc: "Download professional templates instantly", checks: ["Industry-standard formats", "Preview before download", "Email delivery included"], href: "/templates", color: "chart-5" },
-            { icon: TrendingUp, title: "PDF Preview & Export", desc: "Print-ready PDFs with one click", checks: ["Professional formatted output", "Preview before downloading", "Ready to sign and send"], href: "/pricing", color: "green-500" },
-          ].map((item, i) => {
-            const Icon = item.icon
+            { icon: Sparkles, title: "AI Generation", desc: "Complete contracts in minutes with AI that knows music industry language." },
+            { icon: Brain, title: "Smart Analysis", desc: "Upload any contract and AI will flag issues, explain clauses, and suggest improvements." },
+            { icon: Download, title: "PDF Export", desc: "Professional, print-ready PDFs formatted for signing and filing." },
+            { icon: Shield, title: "Industry Standard", desc: "Every template vetted against real music industry agreements." },
+          ].map((feat, i) => {
+            const Icon = feat.icon
             return (
-              <motion.div variants={fadeIn} key={i} className="h-full">
-                <Card className={`bg-card/50 backdrop-blur-sm border-border/40 hover:border-${item.color}/50 transition-all duration-300 hover:shadow-xl hover:shadow-${item.color}/5 hover:-translate-y-1 h-full flex flex-col`}>
-                  <CardHeader>
-                    <div className={`w-14 h-14 rounded-xl bg-${item.color}/10 flex items-center justify-center mb-4`}>
-                      <Icon className={`w-7 h-7 text-${item.color}`} />
-                    </div>
-                    <CardTitle className="text-xl">{item.title}</CardTitle>
-                    <CardDescription>{item.desc}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex-1 flex flex-col justify-between">
-                    <ul className="space-y-3 text-sm text-muted-foreground mb-6">
-                      {item.checks.map((check, j) => (
-                        <li key={j} className="flex items-start gap-2">
-                          <CheckCircle2 className={`w-4 h-4 text-${item.color} mt-0.5 shrink-0`} />
-                          <span>{check}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <Link href={item.href}><Button className={`w-full ${item.color === "primary" ? "bg-primary hover:bg-primary/90" : item.color === "accent" ? "border-accent text-accent hover:bg-accent/10 bg-transparent" : item.color === "chart-5" ? "border-chart-5 text-chart-5 hover:bg-chart-5/10 bg-transparent" : "border-green-500 text-green-500 hover:bg-green-500/10 bg-transparent"} ${item.color !== "primary" ? "variant=outline" : ""}`}>{item.title === "PDF Preview & Export" ? "See Pricing" : item.title === "Free Templates" ? "Browse Templates" : "Try Now"} <ArrowRight className="w-4 h-4 ml-2" /></Button></Link>
-                  </CardContent>
-                </Card>
-              </motion.div>
+              <div key={i} style={{
+                background: "rgba(255,255,255,0.02)",
+                border: "1px solid rgba(255,255,255,0.06)",
+                borderRadius: 10, padding: "28px 24px",
+                transition: "all 300ms",
+              }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-3px)"
+                  e.currentTarget.style.boxShadow = "0 16px 40px rgba(0,0,0,0.3)"
+                  e.currentTarget.style.borderColor = "rgba(201,162,39,0.3)"
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)"
+                  e.currentTarget.style.boxShadow = "none"
+                  e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"
+                }}
+              >
+                <div style={{
+                  width: 40, height: 40, borderRadius: 8,
+                  background: "rgba(201,162,39,0.1)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  marginBottom: 16,
+                }}>
+                  <Icon className="w-5 h-5" style={{ color: "#C9A227" }} />
+                </div>
+                <h3 className="text-[16px] font-bold text-white mb-2">{feat.title}</h3>
+                <p className="text-[13px] leading-relaxed" style={{ color: "rgba(250,250,250,0.4)" }}>{feat.desc}</p>
+              </div>
             )
           })}
-        </motion.div>
-      </section>
-
-      <section className="border-y border-border bg-gradient-to-b from-secondary/30 to-background overflow-hidden relative">
-        <div className="absolute -left-40 -top-40 w-96 h-96 bg-primary/10 rounded-full blur-[100px] pointer-events-none" />
-        <div className="absolute -right-40 -bottom-40 w-96 h-96 bg-accent/10 rounded-full blur-[100px] pointer-events-none" />
-        <div className="container mx-auto px-4 py-20 md:py-32 relative z-10">
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeIn} className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-bold text-foreground mb-4">Why Music Professionals Choose Us</h2>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">Built specifically for the music industry by people who understand it</p>
-          </motion.div>
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={staggerContainer} className="grid md:grid-cols-3 gap-12">
-            {[
-              { icon: Zap, title: "Fast & Efficient", desc: "Generate complete contracts in minutes, not hours. Our AI understands music industry terminology." },
-              { icon: Shield, title: "Legally Sound", desc: "Every template uses industry-standard legal language. Protect yourself with proper documentation." },
-              { icon: Clock, title: "Save Time & Money", desc: "Skip expensive lawyer consultations for standard agreements. Professional contracts at a fraction of the cost." },
-            ].map((item, index) => {
-              const Icon = item.icon
-              return (
-                <motion.div variants={fadeIn} key={index} className="text-center group">
-                  <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/10 flex items-center justify-center mx-auto mb-8 group-hover:scale-110 group-hover:-rotate-3 transition-all duration-500 shadow-lg shadow-primary/5">
-                    <Icon className="w-10 h-10 text-primary" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-foreground mb-4">{item.title}</h3>
-                  <p className="text-lg text-muted-foreground leading-relaxed">{item.desc}</p>
-                </motion.div>
-              )
-            })}
-          </motion.div>
         </div>
       </section>
 
-      <section className="container mx-auto px-4 py-16">
-        <div className="text-center mb-12"><h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">Trusted by Professionals</h2></div>
-        <div className="grid md:grid-cols-3 gap-6">
+      {/* ═══ TESTIMONIALS ═══ */}
+      <section style={{ padding: "100px 32px" }}>
+        <div className="container mx-auto text-center mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4" style={{ fontFamily: "var(--font-serif)" }}>
+            Trusted by Music Professionals
+          </h2>
+        </div>
+        <div className="container mx-auto" style={{
+          display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16,
+        }}>
           {[
             { quote: "Saved me thousands in legal fees. The contracts are professional and comprehensive.", author: "Marcus J.", role: "Independent Producer" },
             { quote: "Finally, contracts that actually understand the music industry. Game changer.", author: "Sarah L.", role: "Artist Manager" },
-            { quote: "I use Artispreneur for all my client agreements. Fast, reliable, professional.", author: "James K.", role: "Session Musician" },
+            { quote: "I use Rostr Contracts for all my client agreements. Fast, reliable, professional.", author: "James K.", role: "Session Musician" },
           ].map((t, i) => (
-            <Card key={i} className="bg-card border-border">
-              <CardContent className="pt-6">
-                <div className="flex gap-1 mb-4">{[...Array(5)].map((_, j) => (<Star key={j} className="w-4 h-4 fill-primary text-primary" />))}</div>
-                <p className="text-foreground mb-4">&ldquo;{t.quote}&rdquo;</p>
-                <div><p className="font-semibold text-foreground">{t.author}</p><p className="text-sm text-muted-foreground">{t.role}</p></div>
-              </CardContent>
-            </Card>
+            <div key={i} style={{
+              background: "rgba(255,255,255,0.02)",
+              border: "1px solid rgba(255,255,255,0.06)",
+              borderRadius: 10, padding: "28px 24px",
+            }}>
+              <div className="flex gap-1 mb-4">
+                {[...Array(5)].map((_, j) => (
+                  <Star key={j} className="w-3.5 h-3.5 fill-[#C9A227] text-[#C9A227]" />
+                ))}
+              </div>
+              <p className="text-[13px] leading-relaxed mb-4" style={{ color: "rgba(250,250,250,0.6)", fontStyle: "italic" }}>
+                "{t.quote}"
+              </p>
+              <div>
+                <p className="text-[13px] font-semibold text-white">{t.author}</p>
+                <p className="text-[11px]" style={{ color: "rgba(250,250,250,0.3)" }}>{t.role}</p>
+              </div>
+            </div>
           ))}
         </div>
       </section>
 
-      <section className="border-t border-border bg-primary/5">
-        <div className="container mx-auto px-4 py-24 text-center">
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeIn}>
-            <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6">Ready to Protect Your Music Business?</h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10">Join thousands of artists, producers, and music professionals who trust Artispreneur.</p>
-            <div className="flex flex-wrap justify-center gap-4">
-              <Link href="/auth/sign-up">
-                <Button size="lg" className="h-14 px-8 text-lg bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:-translate-y-1 transition-all duration-300">
-                  Get Started Free <Sparkles className="w-5 h-5 ml-2" />
-                </Button>
-              </Link>
-              <Link href="/pricing">
-                <Button size="lg" variant="outline" className="h-14 px-8 text-lg hover:bg-accent hover:text-accent-foreground hover:border-accent hover:-translate-y-1 transition-all duration-300">
-                  View Pricing <ArrowRight className="w-5 h-5 ml-2" />
-                </Button>
-              </Link>
-            </div>
-          </motion.div>
+      {/* ═══ CTA ═══ */}
+      <section style={{
+        padding: "120px 32px",
+        background: "radial-gradient(ellipse 60% 60% at 50% 100%, rgba(204,0,0,0.15), transparent 70%), #0A0A0A",
+        textAlign: "center",
+        borderTop: "1px solid rgba(255,255,255,0.06)",
+        position: "relative",
+        overflow: "hidden",
+      }}>
+        <div className="container mx-auto relative z-10">
+          <h2 style={{
+            fontFamily: "var(--font-serif)", fontSize: "clamp(32px, 5vw, 56px)",
+            fontWeight: 700, letterSpacing: "-0.03em", color: "#FAFAFA", margin: "0 0 16px",
+          }}>
+            Every artist deserves<br />
+            <em style={{ fontStyle: "italic", color: "#C9A227", fontSize: "clamp(40px, 6vw, 72px)", display: "block" }}>
+              good contracts.
+            </em>
+          </h2>
+          <p className="text-[15px] leading-relaxed mb-10" style={{ color: "rgba(250,250,250,0.4)", maxWidth: 480, margin: "0 auto 40px" }}>
+            Join thousands of musicians, producers, and managers who protect their work with AI-powered contracts — free.
+          </p>
+          <div className="flex gap-3 justify-center flex-wrap">
+            <Link href="/auth/sign-up">
+              <button style={{
+                background: "#CC0000", color: "#fff", border: "none",
+                borderRadius: 8, padding: "15px 36px", fontSize: 15, fontWeight: 700,
+                cursor: "pointer", fontFamily: "inherit",
+                transition: "all 200ms ease",
+              }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-2px)"
+                  e.currentTarget.style.boxShadow = "0 8px 32px rgba(204,0,0,0.35)"
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)"
+                  e.currentTarget.style.boxShadow = "none"
+                }}
+              >
+                Get Started Free <ArrowRight className="w-4 h-4 ml-1 inline" />
+              </button>
+            </Link>
+            <Link href="#templates">
+              <button style={{
+                background: "transparent", color: "rgba(250,250,250,0.7)",
+                border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8,
+                padding: "15px 28px", fontSize: 15, fontWeight: 500,
+                cursor: "pointer", fontFamily: "inherit",
+              }}>
+                Browse Templates
+              </button>
+            </Link>
+          </div>
         </div>
       </section>
 
-      <footer className="border-t border-border py-8">
-        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} Artispreneur. All rights reserved.</p>
+      {/* ═══ FOOTER ═══ */}
+      <footer style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "40px 32px" }}>
+        <div className="container mx-auto text-center">
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <span style={{ fontFamily: "var(--font-serif)", fontSize: 14, fontWeight: 700, color: "#FAFAFA" }}>
+              Rostr<span style={{ color: "#C9A227" }}>Contracts</span>
+            </span>
+            <span className="text-[8px] font-bold tracking-[0.12em] uppercase" style={{ color: "rgba(255,255,255,0.2)" }}>
+              by Artispreneur
+            </span>
+          </div>
+          <p className="text-[12px]" style={{ color: "rgba(250,250,250,0.2)" }}>
+            &copy; {new Date().getFullYear()} Artispreneur. All rights reserved.
+          </p>
         </div>
       </footer>
-
-      <PDFPreviewModal contract={previewContract} open={previewOpen} onOpenChange={setPreviewOpen} />
     </div>
   )
 }
 
-function DashboardContent() {
-  const { user } = useAuthUser()
-  const [savedContracts, setSavedContracts] = useState<SavedContract[]>([])
-  const [subscription, setSubscription] = useState<{ status: string; contractsRemaining: number } | null>(null)
+/* ════════════════════════════════════════════════════
+   DASHBOARD — Authenticated users
+   ════════════════════════════════════════════════════ */
+function Dashboard() {
+  const [profile, setProfile] = useState<any>(null)
+  const [savedContracts, setSavedContracts] = useState<any[]>([])
+  const [recentChats, setRecentChats] = useState<any[]>([])
 
   useEffect(() => {
-    if (!user) return
-    Promise.all([
-      getSavedContracts(),
-      fetch("/api/check-subscription").then((r) => r.json()).catch(() => null),
-    ]).then(([contracts, sub]) => {
-      setSavedContracts(contracts)
-      setSubscription(sub)
-    })
-  }, [user])
+    try {
+      const p = localStorage.getItem("artispreneur_profile")
+      if (p) setProfile(JSON.parse(p))
+      const saved = localStorage.getItem("artispreneur_saved_contracts")
+      if (saved) setSavedContracts(JSON.parse(saved))
+      const chats = localStorage.getItem("artispreneur_chats")
+      if (chats) setRecentChats(JSON.parse(chats).slice(0, 4))
+    } catch {}
+  }, [])
 
-  const recentContracts = savedContracts.slice(0, 3)
-  const stats = [
-    { icon: FileText, label: "Saved Contracts", value: savedContracts.length, color: "text-primary", bg: "bg-primary/10" },
-    { icon: Upload, label: "Uploaded", value: "0", color: "text-accent", bg: "bg-accent/10" },
-    { icon: FolderOpen, label: "Templates", value: contractTemplates.length, color: "text-green-500", bg: "bg-green-500/10" },
-  ]
+  const displayName = profile?.stageName || profile?.firstName || "Artist"
+  const initial = displayName[0]?.toUpperCase() || "A"
+
+  const quickContracts = contractTemplates.slice(0, 6)
 
   return (
-    <div className="min-h-screen bg-background">
+    <div style={{ backgroundColor: "#050505", minHeight: "100vh" }}>
       <Header />
-      <section className="border-b border-border bg-gradient-to-b from-primary/5 to-transparent">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-between mb-6">
+
+      {/* Welcome Banner */}
+      <section style={{
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        background: "radial-gradient(ellipse 60% 40% at 50% 0%, rgba(201,162,39,0.06), transparent 60%), #050505",
+      }}>
+        <div className="container mx-auto px-4 py-8 md:py-10">
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            flexWrap: "wrap", gap: 16,
+          }}>
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                <LayoutDashboard className="w-6 h-6 text-primary" />
+              <div style={{
+                width: 44, height: 44, borderRadius: "50%",
+                backgroundColor: "#CC0000", color: "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontWeight: 700, fontSize: 16, flexShrink: 0,
+              }}>
+                {initial}
               </div>
               <div>
-                <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-                  Welcome{user?.name ? `, ${user.name}` : " back"}
+                <h1 className="text-xl md:text-2xl font-bold text-white" style={{ fontFamily: "var(--font-serif)" }}>
+                  Welcome{displayName ? `, ${displayName}` : " back"}
                 </h1>
-                <p className="text-sm text-muted-foreground">Generate contracts with AI, manage your documents</p>
+                <p className="text-[13px]" style={{ color: "rgba(250,250,250,0.4)" }}>
+                  Your contract agent is ready. Generate, review, or manage your contracts.
+                </p>
               </div>
             </div>
-            {subscription && subscription.status !== "unlimited" && (
-              <Button asChild size="sm" className="bg-gradient-to-r from-amber-500 to-yellow-500 text-black hidden sm:inline-flex">
-                <Link href="/checkout/unlimited"><Crown className="w-4 h-4 mr-1" />Upgrade</Link>
-              </Button>
-            )}
+            <Link href="/generate">
+              <button style={{
+                background: "#CC0000", color: "#fff", border: "none",
+                borderRadius: 8, padding: "12px 24px", fontSize: 14, fontWeight: 700,
+                cursor: "pointer", fontFamily: "inherit",
+                display: "flex", alignItems: "center", gap: 8,
+                transition: "all 200ms ease",
+              }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-1px)"
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)"
+                }}
+              >
+                <Sparkles className="w-4 h-4" /> New Contract
+              </button>
+            </Link>
           </div>
-          <div className="grid grid-cols-3 gap-4">
-            {stats.map((stat) => {
+
+          {/* Stats */}
+          <div style={{
+            display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+            gap: 12, marginTop: 24,
+          }}>
+            {[
+              { label: "Saved Contracts", value: savedContracts.length, icon: FileText, color: "#C9A227" },
+              { label: "Templates", value: contractTemplates.length, icon: LayoutDashboard, color: "#CC0000" },
+              { label: "Free Tier", value: "Unlimited", icon: Crown, color: "#C9A227" },
+            ].map((stat, i) => {
               const Icon = stat.icon
               return (
-                <Card key={stat.label} className="bg-card/50 border-border">
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-lg ${stat.bg} flex items-center justify-center`}>
-                      <Icon className={`w-5 h-5 ${stat.color}`} />
-                    </div>
-                    <div>
-                      <p className="text-xl font-bold text-foreground">{stat.value}</p>
-                      <p className="text-xs text-muted-foreground">{stat.label}</p>
-                    </div>
-                  </CardContent>
-                </Card>
+                <div key={i} style={{
+                  background: "rgba(255,255,255,0.02)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  borderRadius: 8, padding: "14px 16px",
+                  display: "flex", alignItems: "center", gap: 12,
+                }}>
+                  <div style={{
+                    width: 34, height: 34, borderRadius: 8,
+                    background: `${stat.color}15`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <Icon className="w-4 h-4" style={{ color: stat.color }} />
+                  </div>
+                  <div>
+                    <p className="text-lg font-bold text-white">{stat.value}</p>
+                    <p className="text-[10px] tracking-[0.04em] uppercase" style={{ color: "rgba(250,250,250,0.3)" }}>
+                      {stat.label}
+                    </p>
+                  </div>
+                </div>
               )
             })}
           </div>
         </div>
       </section>
+
+      {/* Main Dashboard Content */}
       <section className="container mx-auto px-4 py-8">
-        <AiContractBuilder onContractSaved={() => getSavedContracts().then(setSavedContracts)} />
-      </section>
-      {recentContracts.length > 0 && (
-        <section className="border-t border-border">
-          <div className="container mx-auto px-4 py-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                <FileText className="w-5 h-5 text-primary" /> Recent Contracts
-              </h2>
-              <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
-                <Link href="/dashboard">View all <ArrowRight className="w-4 h-4 ml-1" /></Link>
-              </Button>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 300px",
+          gap: 20,
+        }}>
+          {/* Left: Quick Generate + Recent */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            {/* AI Contract Agent Card */}
+            <div style={{
+              background: "rgba(255,255,255,0.02)",
+              border: "1px solid rgba(255,255,255,0.06)",
+              borderRadius: 10, padding: "24px 28px",
+            }}>
+              <div className="flex items-center gap-3 mb-4">
+                <div style={{
+                  width: 38, height: 38, borderRadius: 8,
+                  background: "rgba(201,162,39,0.15)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <MessageSquare className="w-5 h-5" style={{ color: "#C9A227" }} />
+                </div>
+                <div>
+                  <h3 className="text-[15px] font-bold text-white" style={{ fontFamily: "var(--font-serif)" }}>
+                    AI Contract Agent
+                  </h3>
+                  <p className="text-[11px]" style={{ color: "rgba(250,250,250,0.35)" }}>
+                    Describe your contract needs in plain English
+                  </p>
+                </div>
+              </div>
+              <div style={{
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 8, padding: "12px 16px", marginBottom: 12,
+              }}>
+                <textarea
+                  placeholder='e.g., "I need an artist management agreement with 15% commission for a 2-year term..."'
+                  rows={3}
+                  style={{
+                    width: "100%", background: "transparent", border: "none",
+                    outline: "none", color: "#FAFAFA", fontFamily: "inherit",
+                    fontSize: 13, resize: "none", lineHeight: 1.6,
+                  }}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex gap-2">
+                  {["Recording", "Management", "Production"].map((cat) => (
+                    <span key={cat} style={{
+                      padding: "4px 10px", borderRadius: 999,
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      fontFamily: "var(--font-mono)", fontSize: 9,
+                      letterSpacing: "0.06em", textTransform: "uppercase",
+                      color: "rgba(250,250,250,0.35)", cursor: "pointer",
+                    }}>
+                      {cat}
+                    </span>
+                  ))}
+                </div>
+                <Link href="/generate">
+                  <button style={{
+                    background: "#C9A227", color: "#050505", border: "none",
+                    borderRadius: 6, padding: "8px 18px", fontSize: 12, fontWeight: 700,
+                    cursor: "pointer", fontFamily: "inherit",
+                    display: "flex", alignItems: "center", gap: 6,
+                  }}>
+                    Generate <Sparkles className="w-3 h-3" />
+                  </button>
+                </Link>
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {recentContracts.map((contract) => (
-                <Card key={contract.id} className="bg-card border-border hover:border-primary/30 transition-colors">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                        <FileText className="w-5 h-5 text-primary" />
+
+            {/* Quick Templates */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-[14px] font-bold text-white" style={{ fontFamily: "var(--font-serif)" }}>
+                  Quick Templates
+                </h3>
+                <Link href="/templates" className="text-[11px] font-semibold" style={{ color: "#C9A227" }}>
+                  View all →
+                </Link>
+              </div>
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                gap: 10,
+              }}>
+                {quickContracts.map((c) => (
+                  <Link key={c.id} href={`/generate?template=${c.slug}`} style={{ textDecoration: "none" }}>
+                    <div style={{
+                      background: "rgba(255,255,255,0.02)",
+                      border: "1px solid rgba(255,255,255,0.06)",
+                      borderRadius: 8, padding: "14px 16px",
+                      transition: "all 200ms", cursor: "pointer",
+                    }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = "rgba(201,162,39,0.3)"
+                        e.currentTarget.style.background = "rgba(255,255,255,0.04)"
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"
+                        e.currentTarget.style.background = "rgba(255,255,255,0.02)"
+                      }}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[9px] font-bold tracking-[0.08em] uppercase px-2 py-0.5 rounded" style={{
+                          background: "rgba(201,162,39,0.1)", color: "#C9A227", fontFamily: "var(--font-mono)",
+                        }}>
+                          {c.category}
+                        </span>
                       </div>
-                      <div className="min-w-0">
-                        <p className="font-medium text-foreground truncate">{contract.title}</p>
-                        <p className="text-xs text-muted-foreground">{new Date(contract.created_at || Date.now()).toLocaleDateString()}</p>
-                      </div>
+                      <p className="text-[12px] font-semibold text-white mb-1">{c.name}</p>
+                      <p className="text-[10px]" style={{ color: "rgba(250,250,250,0.3)" }}>
+                        {c.fields.length} fields
+                      </p>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
+                  </Link>
+                ))}
+              </div>
             </div>
           </div>
-        </section>
-      )}
-      <footer className="border-t border-border py-6">
-        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} Artispreneur. All rights reserved.</p>
+
+          {/* Right Sidebar */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* Recent Contracts */}
+            <div style={{
+              background: "rgba(255,255,255,0.02)",
+              border: "1px solid rgba(255,255,255,0.06)",
+              borderRadius: 10, padding: "18px 20px",
+            }}>
+              <h4 className="text-[12px] font-bold text-white/40 tracking-[0.08em] uppercase mb-3">
+                Recent Contracts
+              </h4>
+              {savedContracts.length > 0 ? (
+                savedContracts.slice(0, 4).map((c: any, i: number) => (
+                  <div key={i} style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "8px 0", borderBottom: i < Math.min(savedContracts.length - 1, 3) ? "1px solid rgba(255,255,255,0.04)" : "none",
+                  }}>
+                    <FileText className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#C9A227", opacity: 0.5 }} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-medium text-white truncate">{c.title || "Contract"}</p>
+                      <p className="text-[9px]" style={{ color: "rgba(250,250,250,0.2)" }}>
+                        {new Date(c.created_at || Date.now()).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-[11px]" style={{ color: "rgba(250,250,250,0.2)" }}>
+                  No saved contracts yet. Generate your first one!
+                </p>
+              )}
+            </div>
+
+            {/* Tips */}
+            <div style={{
+              background: "rgba(201,162,39,0.05)",
+              border: "1px solid rgba(201,162,39,0.1)",
+              borderRadius: 10, padding: "18px 20px",
+            }}>
+              <h4 className="text-[12px] font-bold text-[#C9A227] tracking-[0.08em] uppercase mb-3" style={{ fontFamily: "var(--font-mono)" }}>
+                Pro Tip
+              </h4>
+              <p className="text-[12px] leading-relaxed" style={{ color: "rgba(250,250,250,0.45)" }}>
+                Be specific when describing your contract. Mention names, percentages, dates, and special terms — the AI handles the legal language.
+              </p>
+            </div>
+
+            {/* Quick Links */}
+            <div style={{
+              background: "rgba(255,255,255,0.02)",
+              border: "1px solid rgba(255,255,255,0.06)",
+              borderRadius: 10, padding: "18px 20px",
+            }}>
+              <h4 className="text-[12px] font-bold text-white/40 tracking-[0.08em] uppercase mb-3">
+                Quick Links
+              </h4>
+              <div className="flex flex-col gap-2">
+                {[
+                  { label: "Browse Templates", href: "/templates", icon: FileText },
+                  { label: "Generate Contract", href: "/generate", icon: Sparkles },
+                  { label: "Pricing", href: "/pricing", icon: Crown },
+                ].map((link) => {
+                  const Icon = link.icon
+                  return (
+                    <Link key={link.href} href={link.href} style={{ textDecoration: "none" }}>
+                      <div className="flex items-center gap-2 py-2 px-2 rounded-md transition-colors"
+                        style={{ color: "rgba(250,250,250,0.5)" }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = "rgba(255,255,255,0.04)"
+                          e.currentTarget.style.color = "#FAFAFA"
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = "transparent"
+                          e.currentTarget.style.color = "rgba(250,250,250,0.5)"
+                        }}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                        <span className="text-[12px] font-medium">{link.label}</span>
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "32px", marginTop: 40 }}>
+        <div className="container mx-auto text-center">
+          <p className="text-[11px]" style={{ color: "rgba(250,250,250,0.2)" }}>
+            &copy; {new Date().getFullYear()} Artispreneur. All rights reserved.
+          </p>
         </div>
       </footer>
     </div>
   )
 }
 
+/* ════════════════════════════════════════════════════
+   MAIN PAGE — Route based on auth state
+   ════════════════════════════════════════════════════ */
 export default function HomePage() {
-  const { user, loading } = useAuthUser()
+  const [loggedIn, setLoggedIn] = useState<boolean | null>(null)
 
-  if (loading) {
+  useEffect(() => {
+    setLoggedIn(localStorage.getItem("artispreneur_logged_in") === "true")
+  }, [])
+
+  if (loggedIn === null) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div style={{ backgroundColor: "#050505", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: 24, height: 24, borderRadius: "50%", border: "2px solid rgba(201,162,39,0.3)", borderTopColor: "#C9A227", animation: "spin 0.8s linear infinite" }} />
       </div>
     )
   }
 
-  if (user) {
-    return <DashboardContent />
-  }
-
+  if (loggedIn) return <Dashboard />
   return <LandingPage />
 }
