@@ -1,8 +1,14 @@
-// localStorage-based auth for server components (stub — returns null in server context)
+// localStorage-based auth for server + client components
+// Stripped of Supabase — uses client-side localStorage only
+
+export type AuthProvider = "local"
+
 export interface AuthUser {
   id: string
-  email: string
-  name?: string
+  email?: string | null
+  name?: string | null
+  provider: AuthProvider
+  created_at?: string
 }
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
@@ -14,11 +20,16 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     if (loggedIn && profileStr) {
       const profile = JSON.parse(profileStr)
       return {
-        id: profile.email || "user",
+        id: profile.email || "local-user",
         email: profile.email || "",
         name: profile.stageName || profile.firstName || "",
+        provider: "local",
       }
     }
   } catch {}
   return null
+}
+
+export function hasSupabaseSessionCookie(_cookieNames: string[]): boolean {
+  return false
 }

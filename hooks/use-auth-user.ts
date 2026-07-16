@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback } from "react"
 
 interface AuthUser {
   id: string
-  email: string
-  name?: string
+  email?: string | null
+  name?: string | null
 }
 
 export function useAuthUser() {
@@ -19,7 +19,7 @@ export function useAuthUser() {
       if (loggedIn && profileStr) {
         const profile = JSON.parse(profileStr)
         setUser({
-          id: profile.email || "user",
+          id: profile.email || "local-user",
           email: profile.email || "",
           name: profile.stageName || profile.firstName || "",
         })
