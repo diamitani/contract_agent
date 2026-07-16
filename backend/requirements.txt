@@ -1,0 +1,8 @@
+# Backend dependencies for AWS Lambda
+fastapi==0.115.0
+mangum==0.19.0
+boto3==1.36.0
+psycopg2-binary==2.9.10
+pydantic==2.10.0
+python-jose[cryptography]==3.3.0
+httpx==0.28.0
