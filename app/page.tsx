@@ -51,8 +51,8 @@ function LandingPage() {
 
         <div className="container mx-auto px-4 py-16 md:py-28 text-center relative z-10">
           {/* Badge */}
-          <div style={fadeIn} className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-8"
-            style={{ border: "1px solid rgba(201,162,39,0.2)", background: "rgba(201,162,39,0.06)" }}>
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-8"
+            style={{ border: "1px solid rgba(201,162,39,0.2)", background: "rgba(201,162,39,0.06)", animation: "fade-up 0.6s ease both" }}>
             <Sparkles className="w-3.5 h-3.5" style={{ color: "#C9A227" }} />
             <span className="text-[12px] font-semibold tracking-[0.08em] uppercase" style={{ color: "#C9A227" }}>
               AI Contract Agent
