@@ -16,7 +16,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet"
 import { useState } from "react"
 
-function getProfile(): { name: string; stageName: string } | null {
+function getProfile(): { name: string; stageName: string; artistType?: string } | null {
   if (typeof window === "undefined") return null
   try {
     const p = localStorage.getItem("artispreneur_profile")
